@@ -16,7 +16,7 @@ const PortalCard = ({ item, index }) => {
     >
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between">
-          <span className="font-mono text-[10px] text-gray-300 font-bold uppercase tracking-tight">
+          <span className="font-mono text-[11px] md:text-[12px] text-gray-400 font-bold uppercase tracking-[0.1em]">
             [ PORT_ACCESS ]
           </span>
           <div 
@@ -25,11 +25,11 @@ const PortalCard = ({ item, index }) => {
           />
         </div>
         
-        <h3 className="font-mono text-[13px] font-extrabold text-black flex items-center gap-1 group-hover:text-blue-600 transition-colors">
+        <h3 className="font-mono text-[16px] md:text-[18px] font-extrabold text-black flex items-center gap-2 group-hover:text-blue-600 transition-colors mt-1">
           <span className="opacity-40 group-hover:opacity-100 transition-opacity">→</span> {title.toUpperCase()}
         </h3>
         
-        <p className="font-serif text-[11px] italic text-gray-400 leading-tight">
+        <p className="font-serif text-[13px] md:text-[14px] italic text-gray-500 leading-tight">
           {subtitle}
         </p>
       </div>

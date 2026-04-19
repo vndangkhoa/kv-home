@@ -7,55 +7,61 @@ const Section = ({ title, description, children, index, isFeatured, featuredImag
   
   // Format index as 001, 002, etc.
   const figNumber = String(index + 1).padStart(3, '0');
+  const isEven = index % 2 === 0;
 
   return (
-    <section className={`ms-container relative py-4 md:py-8 flex flex-col ${isFeatured ? 'md:flex-col lg:flex-row' : 'md:flex-row'} gap-6 md:gap-12`}>
-      {/* Sidebar Illustration Info */}
-      <div className={`${isFeatured ? 'lg:w-1/2' : 'md:w-1/3'} flex group`}>
-        <div className="relative w-full">
-          {/* Vertical Label - Desktop Only */}
-          <motion.div
-            initial={{ opacity: 0, x: -10 }}
-            animate={isInView ? { opacity: 1, x: 0 } : {}}
-            transition={{ duration: 0.5 }}
-            className="hidden md:block vertical-text absolute -left-8 top-0 text-[10px] font-mono text-gray-300 tracking-widest uppercase font-bold"
-          >
-            FIG. {figNumber}
-          </motion.div>
-          
-          <div className="md:pr-4">
-            <h2 className={`${isFeatured ? 'text-2xl md:text-3xl' : 'text-xl md:text-sm'} font-pixel text-blue-600 mb-6 md:mb-8 tracking-wider uppercase`}>
-              {isFeatured ? `FEATURED: ${title}` : title}
-            </h2>
-            <p className={`${isFeatured ? 'text-[18px] md:text-[20px] leading-relaxed' : 'text-[15px] md:text-[14px] leading-relaxed'} font-serif text-gray-800 drop-cap opacity-95 group-hover:opacity-100 transition-opacity`}>
-              {description}
-            </p>
+    <div className={isFeatured ? "w-full bg-blue-50/20 border-y-2 border-blue-50/50 py-4 my-8 relative shadow-sm" : "w-full"}>
+      <section className={`ms-container relative py-8 md:py-16 flex flex-col ${isEven ? 'lg:flex-row' : 'lg:flex-row-reverse'} gap-8 lg:gap-16 items-start`}>
+      {/* Sidebar Label - Desktop Only */}
+      <motion.div
+        initial={{ opacity: 0, x: isEven ? -10 : 10 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        viewport={{ once: true }}
+        className={`hidden lg:block vertical-text absolute ${isEven ? '-left-8' : '-right-8'} top-0 text-[11px] font-mono text-gray-300 tracking-[0.3em] uppercase font-bold`}
+      >
+        FIG. {figNumber}
+      </motion.div>
 
-            {isFeatured && featuredImage && (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={isInView ? { opacity: 1, scale: 1 } : {}}
-                transition={{ duration: 1, delay: 0.2 }}
-                className="mt-12 border border-gray-100 p-2 bg-white shadow-2xl shadow-blue-900/5"
-              >
-                <img src={featuredImage} alt="Featured Technical Illustration" className="w-full h-auto" />
-                <div className="mt-4 flex justify-between items-center font-mono text-[9px] text-gray-400 uppercase tracking-widest px-2">
-                  <span>SCALE 1:15</span>
-                  <span>EXPLODED_VIEW_DIG.V1</span>
-                </div>
-              </motion.div>
-            )}
-          </div>
+      {/* Content Column (Text & Buttons) */}
+      <div className="w-full lg:w-[45%] flex flex-col z-10 w-full relative">
+        <h2 className={`font-pixel text-blue-600 mb-6 tracking-wider uppercase leading-tight ${isFeatured ? 'text-3xl md:text-4xl lg:text-5xl drop-shadow-sm' : 'text-xl md:text-2xl'}`}>
+          {title}
+        </h2>
+        
+        <div className="manual-text drop-cap mb-8">
+          {description}
         </div>
-      </div>
 
-      {/* Main Grid Content */}
-      <div className={`${isFeatured ? 'lg:w-1/2' : 'md:w-2/3'}`}>
-        <div className={`grid grid-cols-1 ${isFeatured ? 'sm:grid-cols-1 md:grid-cols-2' : 'sm:grid-cols-2'} gap-4`}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {children}
         </div>
       </div>
-    </section>
+
+      {/* Blueprint Column (Animation) */}
+      <div className="w-full lg:w-[55%]">
+        {featuredImage && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true, margin: "-50px" }}
+            className="blueprint-container"
+          >
+             {typeof featuredImage === 'string' ? (
+               <img src={featuredImage} alt={title} className="w-full h-auto grayscale hover:grayscale-0 transition-all duration-700" />
+             ) : (
+               <div className="w-full h-auto grayscale hover:grayscale-0 transition-all duration-700">
+                 {featuredImage}
+               </div>
+             )}
+            <div className="mt-3 flex justify-between items-center font-mono text-[9px] text-gray-400 uppercase tracking-widest px-1">
+              <span>SYSTEM_SCHEMATIC_V.1</span>
+              <span>ID_{figNumber}</span>
+            </div>
+          </motion.div>
+        )}
+      </div>
+      </section>
+    </div>
   );
 };
 

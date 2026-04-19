@@ -125,24 +125,24 @@ export const groups = [
         id: 'primary', 
         title: 'PRIMARY', 
         icon: Briefcase,
-        description: "Explore the underlying principles of the primary ecosystem. Each component is designed for maximum efficiency and conceptual clarity in your daily workflow."
+        description: "Have you ever wondered how your digital presence is routed across different platforms? The primary resource layer acts as the centralized directory for all professional identities. These components are hard-coded for maximum reliability and persistent access to the core VNDK ecosystem."
     },
     { 
         id: 'entertainment', 
-        title: 'ENTERTAINMENT', 
+        title: 'MEDIA_DISTRIBUTION', 
         icon: Monitor,
-        description: "Digital consumption and leisure systems. A curated selection of platforms for high-fidelity media streaming and interactive entertainment."
+        description: "Digital consumption and leisure systems operate on a separate high-fidelity distribution plane. By utilizing unauthorized ad-blocking layers and clean streaming protocols, we ensure that media remains an uninterrupted experience within the portal."
     },
     { 
         id: 'rm8pfix-vn', 
-        title: 'RM8PFIX-VN', 
+        title: 'SYSTEM_MAINTENANCE', 
         icon: Wrench,
-        description: "Specialized system utilities and maintenance protocols for local network environments. Ensuring stability and performance through automated tooling."
+        description: "This terminal routes directly to the REDMAGIC hardware modification group. Representing flagship architecture (builds 8, 9, and 10 Pro), these devices feature top-tier Snapdragon processing and kernel-level flexibility, granting enthusiasts absolute administrative control to deeply customize their systems."
     },
     { 
         id: 'dev', 
-        title: 'DEV TOOLS', 
+        title: 'DEVELOPMENT_STACK', 
         icon: Cpu,
-        description: "A comprehensive toolkit for the modern developer. From binary manipulation to layout verification, these utilities accelerate the build process."
+        description: "Because our software tools are built on primitive data types, we need a robust stack to handle rasterization, PDF serialization, and IT utility execution. This toolkit provides the necessary abstractions to manipulate system state at the binary level."
     },
 ];
