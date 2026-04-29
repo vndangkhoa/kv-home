@@ -49,9 +49,9 @@ function TetrisPiece({ piece, isDark }) {
 const bgColor = piece.label === 'cv' 
   ? piece.color 
   : (isDark || isMobile) 
-    ? (color || piece.color) 
+    ? (color !== null && color !== undefined ? color : piece.color) 
     : '#cccccc'; // Start gray for desktop
-  const rowDelay = piece.startY * 8;
+  const rowDelay = (piece.startY * 10) + (piece.startX * 2);  // Stagger based on both X and Y position
   const textColor = '#ffffff';
   const isStatic = piece.label === 'cv' || piece.featured;
   
