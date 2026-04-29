@@ -1,43 +1,46 @@
-# VNDANGKHOA PORTAL
+# Khoa.vo Portal
 
-> **A reference manual for people who design and build software.**
+> A personal link portal with tetris-style grid layout.
 
-Welcome to the central routing and access layer for the VNDK network environment. The portal has been structurally architected to reflect a highly professional, physical **Technical Reference Manual**, complete with custom animated isometric and flat orthographic vector schematics.
+## Overview
 
-## 🗂️ System Architecture
+A responsive web portal that displays links in a tetris-inspired grid layout. Each block represents a different service or project, with animations that drop blocks from top to bottom on page load.
 
-This interface acts as the definitive directory for all persistent nodes within the ecosystem:
-*   **PRIMARY**: Centralized directory logic, routing to professional Showcase (Portfolio) and Archive (CV) paths.
-*   **MEDIA_DISTRIBUTION**: High-fidelity streaming environments for digital consumption (Spotify, Netflix, YouTube).
-*   **SYSTEM_MAINTENANCE**: Unlocked kernel-level access terminals to the REDMAGIC hardware modification and patching local nodes.
-*   **DEVELOPMENT_STACK**: Native compilation logic and file manipulation toolchains (Rasterization, PDF serialization, Shell execution).
+## Features
 
-## 🛠️ Stack Components
+- **Tetris Grid Layout**: Blocks arrange themselves in a non-overlapping grid pattern
+- **Sequential Animation**: Blocks drop in one by one from top to bottom on refresh
+- **Row-based Color Blink**: Colors pulse row by row with a subtle breathing effect
+- **Mobile Responsive**: Optimized for mobile devices with touch-friendly buttons
+- **Dark/Light Theme**: Toggle between dark and light modes
+- **Refresh Layout**: Shuffle button to regenerate the grid layout
 
-The portal leverages modern build primitives to ensure rendering speed and layout precision:
-*   **Core**: React + Vite
-*   **Aesthetics**: Tailwind CSS (featuring custom Pixel Perfect blueprint styling)
-*   **Typography**: PT Serif, IBM Plex Mono, Silkscreen
-*   **Animation Engine**: Framer Motion (powering the 2D/2.5D schematic animations)
+## Links
 
-## 🚀 Execution Protocols
+- portfolio - Portfolio website
+- cv - Video resume
+- netflix, youtube, spotify, tiktok - Media platforms
+- tools, save, free, jpg, pdf - Utility links
+- rm8pfix - Custom project
 
-To instantiate the local development environment:
+## Stack
+
+- React + Vite
+- CSS (no external CSS framework)
+
+## Run locally
 
 ```bash
-# 1. Install dependencies
 npm install
-
-# 2. Boot the development server
 npm run dev
+```
 
-# 3. Compile for production routing
+## Build
+
+```bash
 npm run build
 ```
 
-## 📐 Blueprint Engine
-
-All visual data diagrams exist as pure, inline SVG components. These are located in `src/components/illustrations/` and use mathematical transformations (like `scale(1, 0.5) rotate(45)`) combined with `<motion.path>` libraries to achieve a true, lightweight "holographic blueprint" aesthetic devoid of heavy rasterized limits.
-
 ---
-*© 2026 REPRODUCED PIXEL PERFECT. Managed and illustrated by Khoa Vo.*
+
+*© 2026 Khoa.vo*
