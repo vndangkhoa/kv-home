@@ -24,7 +24,8 @@ function TetrisPiece({ piece, isDark }) {
     setShowText(false);
   };
 
-  const handleClick = () => {
+  const handleClick = (e) => {
+    e.preventDefault();
     if (piece.link) {
       window.open(piece.link, '_blank', 'noopener,noreferrer');
     }
