@@ -44,16 +44,14 @@ function TetrisPiece({ piece, isDark }) {
     }
   };
   
-  // For desktop: start gray, show hover color when hovering
-// For mobile dark: use colorDark for less gray
-// For mobile light: use actual color
-const bgColor = piece.label === 'cv' 
-  ? piece.color 
-  : (isMobile && isDark) 
-    ? (color || piece.colorDark || piece.color) 
-    : (isMobile) 
-      ? (color || piece.color)
-      : '#cccccc'; // Start gray for desktop
+  // Static pieces (CV, Portfolio): always show their color
+// Other pieces: desktop starts gray, mobile uses actual color
+const isStaticPiece = piece.label === 'cv' || piece.featured;
+const bgColor = isStaticPiece
+  ? (isDark ? (piece.colorDark || piece.color) : piece.color)
+  : (isMobile) 
+    ? (color || piece.color)
+    : '#cccccc'; // Start gray for desktop
   const rowDelay = (piece.startY * 10) + (piece.startX * 2);  // Stagger based on both X and Y position
   const textColor = '#ffffff';
   const isStatic = piece.label === 'cv' || piece.featured;
@@ -69,14 +67,16 @@ const bgColor = piece.label === 'cv'
     animationFillMode: 'forwards',
   };
 
-  // For desktop: use hoverColor when hovering, otherwise gray
-// For mobile: use blinkColor for animation (will start dim via animation)
+  // For static pieces (CV, Portfolio): always show static color
+// For non-static: desktop uses hover, mobile uses animation
 const bgStyle = {
     position: 'absolute',
     inset: 0,
-    backgroundColor: isDark || isMobile 
-      ? (color || bgColor)  // Use actual color for blink animation
-      : (isHovered ? (piece.hoverColor || color) : '#cccccc'), // Hover color or gray
+    backgroundColor: isStaticPiece 
+      ? bgColor  // Static pieces always show their color
+      : (isDark || isMobile) 
+        ? (color || bgColor)  // Use actual color for blink animation
+        : (isHovered ? (piece.hoverColor || color) : '#cccccc'), // Hover color or gray
     transition: 'background-color 0.15s ease',
   };
 
