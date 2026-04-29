@@ -44,14 +44,19 @@ function TetrisPiece({ piece, isDark }) {
     }
   };
   
-  // Static pieces (CV, Portfolio): always show their color
-// Other pieces: desktop starts gray, mobile uses actual color
-const isStaticPiece = piece.label === 'cv' || piece.featured;
-const bgColor = isStaticPiece
-  ? (isDark ? (piece.colorDark || piece.color) : piece.color)
-  : (isMobile) 
-    ? (color || piece.color)
-    : '#cccccc'; // Start gray for desktop
+  // For static pieces (CV, Portfolio): show actual color immediately
+// For desktop non-static: start gray, show hover color when hovering
+// For mobile dark: use colorDark for less gray
+// For mobile light: use actual color
+const bgColor = piece.label === 'cv' 
+  ? piece.color 
+  : (isStatic) 
+    ? piece.color // Static pieces show color immediately
+    : (isMobile && isDark) 
+      ? (color || piece.colorDark || piece.color) 
+      : (isMobile) 
+        ? (color || piece.color)
+        : '#cccccc'; // Start gray for desktop only
   const rowDelay = (piece.startY * 10) + (piece.startX * 2);  // Stagger based on both X and Y position
   const textColor = '#ffffff';
   const isStatic = piece.label === 'cv' || piece.featured;
@@ -67,16 +72,14 @@ const bgColor = isStaticPiece
     animationFillMode: 'forwards',
   };
 
-  // For static pieces (CV, Portfolio): always show static color
-// For non-static: desktop uses hover, mobile uses animation
+  // For desktop: use hoverColor when hovering, otherwise gray
+// For mobile: use blinkColor for animation (will start dim via animation)
 const bgStyle = {
     position: 'absolute',
     inset: 0,
-    backgroundColor: isStaticPiece 
-      ? bgColor  // Static pieces always show their color
-      : (isDark || isMobile) 
-        ? (color || bgColor)  // Use actual color for blink animation
-        : (isHovered ? (piece.hoverColor || color) : '#cccccc'), // Hover color or gray
+    backgroundColor: isDark || isMobile 
+      ? (color || bgColor)  // Use actual color for blink animation
+      : (isHovered ? (piece.hoverColor || color) : '#cccccc'), // Hover color or gray
     transition: 'background-color 0.15s ease',
   };
 
@@ -179,18 +182,18 @@ function App() {
   
   const shuffleLayout = () => {
     const items = [
-      { w: 4, h: 1, label: 'rm8pfix', link: 'https://rm8pfix.khoavo.myds.me', color: '#E8E8E8', colorDark: '#1a1a1a', hoverColor: '#00BCD4', blinkColor: '#6DD5D6' },
-      { w: 2, h: 2, label: 'netflix', link: 'https://nf.khoavo.myds.me', color: '#E8E8E8', colorDark: '#2a2a2a', hoverColor: '#FF9800', blinkColor: '#E6A84A' },
-      { w: 2, h: 3, label: 'portfolio', link: 'https://portfolio.khoavo.myds.me', featured: true, color: '#4A7BC7', colorDark: '#1a3a5c', hoverColor: '#2196F3', blinkColor: '#6B8BC9' },
-      { w: 2, h: 3, label: 'cv', link: 'https://cv.khoavo.myds.me', color: '#616161', colorDark: '#2a2a2a', hoverColor: '#424242', blinkColor: '#888888' },
-      { w: 2, h: 2, label: 'youtube', link: 'https://ut.khoavo.myds.me', color: '#E8E8E8', colorDark: '#2a2a2a', hoverColor: '#FF5722', blinkColor: '#D97856' },
-      { w: 2, h: 2, label: 'tiktok', link: 'https://tt.khoavo.myds.me', color: '#E8E8E8', colorDark: '#2a2a2a', hoverColor: '#9C27B0', blinkColor: '#B87ABF' },
-      { w: 3, h: 2, label: 'spotify', link: 'https://sp.khoavo.myds.me', color: '#E8E8E8', colorDark: '#2a2a2a', hoverColor: '#4CAF50', blinkColor: '#78B578' },
-      { w: 3, h: 2, label: 'tools', link: 'https://it.khoavo.myds.me', color: '#E8E8E8', colorDark: '#2a2a2a', hoverColor: '#FFC107', blinkColor: '#E6C449' },
-      { w: 2, h: 2, label: 'save', link: 'https://save.khoavo.myds.me', color: '#E8E8E8', colorDark: '#2a2a2a', hoverColor: '#E91E63', blinkColor: '#D0648A' },
-      { w: 2, h: 2, label: 'free', link: 'https://free.khoavo.myds.me', color: '#E8E8E8', colorDark: '#2a2a2a', hoverColor: '#00BCD4', blinkColor: '#6DD5D6' },
-      { w: 2, h: 2, label: 'jpg', link: 'https://jpg.khoavo.myds.me', color: '#E8E8E8', colorDark: '#2a2a2a', hoverColor: '#673AB7', blinkColor: '#9A88BF' },
-      { w: 2, h: 2, label: 'pdf', link: 'https://pdf.khoavo.myds.me', color: '#E8E8E8', colorDark: '#2a2a2a', hoverColor: '#795548', blinkColor: '#A6917C' },
+      { w: 4, h: 1, label: 'rm8pfix', link: 'https://rm8pfix.khoavo.myds.me', color: '#E8E8E8', colorDark: '#333333', hoverColor: '#00BCD4', blinkColor: '#6DD5D6' },
+      { w: 2, h: 2, label: 'netflix', link: 'https://nf.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#FF9800', blinkColor: '#E6A84A' },
+      { w: 2, h: 3, label: 'portfolio', link: 'https://portfolio.khoavo.myds.me', featured: true, color: '#4A7BC7', colorDark: '#2d4a7c', hoverColor: '#2196F3', blinkColor: '#6B8BC9' },
+      { w: 2, h: 3, label: 'cv', link: 'https://cv.khoavo.myds.me', color: '#616161', colorDark: '#424242', hoverColor: '#424242', blinkColor: '#888888' },
+      { w: 2, h: 2, label: 'youtube', link: 'https://ut.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#FF5722', blinkColor: '#D97856' },
+      { w: 2, h: 2, label: 'tiktok', link: 'https://tt.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#9C27B0', blinkColor: '#B87ABF' },
+      { w: 3, h: 2, label: 'spotify', link: 'https://sp.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#4CAF50', blinkColor: '#78B578' },
+      { w: 3, h: 2, label: 'tools', link: 'https://it.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#FFC107', blinkColor: '#E6C449' },
+      { w: 2, h: 2, label: 'save', link: 'https://save.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#E91E63', blinkColor: '#D0648A' },
+      { w: 2, h: 2, label: 'free', link: 'https://free.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#00BCD4', blinkColor: '#6DD5D6' },
+      { w: 2, h: 2, label: 'jpg', link: 'https://jpg.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#673AB7', blinkColor: '#9A88BF' },
+      { w: 2, h: 2, label: 'pdf', link: 'https://pdf.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#795548', blinkColor: '#A6917C' },
     ];
     
     const random = (s) => {
