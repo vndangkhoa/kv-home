@@ -44,8 +44,13 @@ function TetrisPiece({ piece, isDark }) {
     }
   };
   
-  // Start with background color (will be overridden by animation for mobile)
-const bgColor = piece.label === 'cv' ? piece.color : (isDark ? piece.colorDark : piece.color);
+  // For desktop: start gray, show hover color when hovering
+// For mobile: use actual color (will be animated)
+const bgColor = piece.label === 'cv' 
+  ? piece.color 
+  : (isDark || isMobile) 
+    ? (color || piece.color) 
+    : '#cccccc'; // Start gray for desktop
   const rowDelay = piece.startY * 8;
   const textColor = '#ffffff';
   const isStatic = piece.label === 'cv' || piece.featured;
