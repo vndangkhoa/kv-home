@@ -74,14 +74,17 @@ if (piece.label === 'cv' || piece.label === 'portfolio' || piece.featured) {
     animationFillMode: 'forwards',
   };
 
-  // For desktop: use hoverColor when hovering, otherwise gray
+  // For static pieces: always show piece.color
+// For desktop non-static: show hoverColor when hovering, otherwise gray
 // For mobile: use blinkColor for animation (will start dim via animation)
 const bgStyle = {
     position: 'absolute',
     inset: 0,
-    backgroundColor: isDark || isMobile 
-      ? (color || bgColor)  // Use actual color for blink animation
-      : (isHovered ? (piece.hoverColor || color) : '#cccccc'), // Hover color or gray
+    backgroundColor: isStatic 
+      ? piece.color // Static pieces always show their color
+      : (isDark || isMobile) 
+        ? (color || bgColor)  // Use actual color for blink animation
+        : (isHovered ? (piece.hoverColor || color) : '#cccccc'), // Hover color or gray
     transition: 'background-color 0.15s ease',
   };
 
