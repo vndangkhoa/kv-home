@@ -14,12 +14,12 @@
 }
 
 [data-theme="dark"] {
-  --bg-cream: #1a1a1a;
-  --bg-board: #222222;
+  --bg-cream: #0a0a0a;
+  --bg-board: #111111;
   --text-primary: #ffffff;
-  --text-secondary: #888888;
-  --border-color: #444444;
-  --cell-default: #333333;
+  --text-secondary: #666666;
+  --border-color: #333333;
+  --cell-default: #1a1a1a;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
