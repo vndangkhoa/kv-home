@@ -24,23 +24,44 @@ function TetrisPiece({ piece, isDark }) {
     setShowText(false);
   };
   
-  const bgColor = piece.label === 'cv' ? piece.color : piece.color;
+  const bgColor = piece.label === 'cv' 
+    ? piece.color 
+    : (isDark ? piece.colorDark : piece.color);
   const rowDelay = piece.startY * 4;
+  const textColor = '#ffffff';
+  const isStatic = piece.label === 'cv' || piece.featured;
   
-  const style = {
+  const containerStyle = {
     gridColumn: `${piece.startX + 1} / span ${piece.w}`,
     gridRow: `${piece.startY + 1} / span ${piece.h}`,
-    backgroundColor: color || bgColor,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    aspectRatio: '1',
-    transition: 'background 0.15s ease',
-    cursor: piece.link ? 'pointer' : 'default',
-    overflow: 'hidden',
     position: 'relative',
-    animation: `dropIn 0.5s ease-out forwards, colorBlink 5s ease-in-out ${rowDelay}s infinite`,
-    animationFillMode: 'forwards, none',
+    cursor: piece.link ? 'pointer' : 'default',
+    animation: isStatic 
+      ? `dropIn 0.5s ease-out forwards` 
+      : `dropIn 0.5s ease-out forwards, blink 3s ease-in-out ${rowDelay}s infinite`,
+    animationFillMode: 'forwards',
+  };
+
+  const bgStyle = {
+    position: 'absolute',
+    inset: 0,
+    backgroundColor: color || bgColor,
+    transition: 'background-color 0.15s ease',
+    pointerEvents: 'none',
+  };
+
+  const textStyle = {
+    position: 'absolute',
+    bottom: '8px',
+    left: '8px',
+    fontSize: 'clamp(8px, 1.5vw, 12px)',
+    fontWeight: '500',
+    textTransform: 'lowercase',
+    color: textColor,
+    opacity: alwaysShowText ? 1 : (showText ? 1 : 0),
+    transition: 'opacity 0.15s ease, color 0.15s ease',
+    zIndex: 1,
+    pointerEvents: 'none',
   };
   
   const className = 'tetris-piece show';
@@ -48,62 +69,35 @@ function TetrisPiece({ piece, isDark }) {
   // CV block shows looping video
   if (isCV) {
     return (
-      <a 
-        href={piece.link} 
-        target="_blank" 
-        rel="noopener"
-        className={className}
-        style={style}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            opacity: 1,
-            transition: 'opacity 0.15s ease',
-            border: 'none',
-            outline: 'none',
-          }}
+      <div style={containerStyle} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+        <a 
+          href={piece.link} 
+          target="_blank" 
+          rel="noopener"
+          style={{...bgStyle, display: 'flex', alignItems: 'center', justifyContent: 'center'}}
         >
-          <source src="/cv-video.mp4" type="video/mp4" />
-        </video>
-        <span style={{
-          position: 'absolute',
-          bottom: '8px',
-          left: '8px',
-          fontSize: 'clamp(8px, 1.5vw, 12px)',
-          fontWeight: '500',
-          textTransform: 'lowercase',
-          color: '#fff',
-          opacity: 1,
-          transition: 'opacity 0.15s ease',
-        }}>
-          {piece.label}
-        </span>
-      </a>
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              opacity: 1,
+              border: 'none',
+              outline: 'none',
+            }}
+          >
+            <source src="/cv-video.mp4" type="video/mp4" />
+          </video>
+        </a>
+        <span style={{...textStyle, color: '#fff'}}>{piece.label}</span>
+      </div>
     );
   }
-  
-  // Text only shows on hover, positioned at bottom left
-  const textStyle = {
-    fontSize: 'clamp(8px, 1.5vw, 12px)',
-    fontWeight: '500',
-    textTransform: 'lowercase',
-    color: alwaysShowText ? '#fff' : '#000',
-    opacity: alwaysShowText ? 1 : (showText ? 1 : 0),
-    transition: 'opacity 0.15s ease',
-    position: 'absolute',
-    bottom: '8px',
-    left: '8px',
-  };
-  
+
   const wrapperStyle = {
     position: 'relative',
     width: '100%',
@@ -112,29 +106,32 @@ function TetrisPiece({ piece, isDark }) {
   
   if (piece.link) {
     return (
-      <a 
-        href={piece.link} 
-        target="_blank" 
-        rel="noopener"
-        className={className}
-        style={style}
+      <div 
+        style={containerStyle}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <div style={wrapperStyle}>
-          <span style={textStyle}>{piece.label}</span>
-        </div>
-      </a>
+        <a 
+          href={piece.link} 
+          target="_blank" 
+          rel="noopener"
+          style={{...bgStyle, display: 'flex', alignItems: 'center', justifyContent: 'center'}}
+        >
+          <div style={wrapperStyle}>
+            <span style={textStyle}>{piece.label}</span>
+          </div>
+        </a>
+      </div>
     );
   }
   
   return (
     <div 
-      className={className}
-      style={style}
+      style={containerStyle}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
+      <div style={bgStyle}></div>
       <div style={wrapperStyle}>
         <span style={{...textStyle, cursor: 'default'}}>{piece.label}</span>
       </div>
@@ -151,18 +148,18 @@ function App() {
   
   const shuffleLayout = () => {
     const items = [
-      { w: 4, h: 1, label: 'rm8pfix', link: 'https://rm8pfix.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#00BCD4' },
-      { w: 2, h: 2, label: 'netflix', link: 'https://nf.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#FF9800' },
-      { w: 2, h: 3, label: 'portfolio', link: 'https://portfolio.khoavo.myds.me', featured: true, color: '#4A7BC7', hoverColor: '#2196F3' },
-      { w: 2, h: 3, label: 'cv', link: 'https://cv.khoavo.myds.me', color: '#616161', hoverColor: '#424242' },
-      { w: 2, h: 2, label: 'youtube', link: 'https://ut.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#FF5722' },
-      { w: 2, h: 2, label: 'tiktok', link: 'https://tt.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#9C27B0' },
-      { w: 3, h: 2, label: 'spotify', link: 'https://sp.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#4CAF50' },
-      { w: 3, h: 2, label: 'tools', link: 'https://it.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#FFC107' },
-      { w: 2, h: 2, label: 'save', link: 'https://save.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#E91E63' },
-      { w: 2, h: 2, label: 'free', link: 'https://free.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#00BCD4' },
-      { w: 2, h: 2, label: 'jpg', link: 'https://jpg.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#673AB7' },
-      { w: 2, h: 2, label: 'pdf', link: 'https://pdf.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#795548' },
+      { w: 4, h: 1, label: 'rm8pfix', link: 'https://rm8pfix.khoavo.myds.me', color: '#E8E8E8', colorDark: '#333333', hoverColor: '#00BCD4' },
+      { w: 2, h: 2, label: 'netflix', link: 'https://nf.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#FF9800' },
+      { w: 2, h: 3, label: 'portfolio', link: 'https://portfolio.khoavo.myds.me', featured: true, color: '#4A7BC7', colorDark: '#2d4a7c', hoverColor: '#2196F3' },
+      { w: 2, h: 3, label: 'cv', link: 'https://cv.khoavo.myds.me', color: '#616161', colorDark: '#424242', hoverColor: '#424242' },
+      { w: 2, h: 2, label: 'youtube', link: 'https://ut.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#FF5722' },
+      { w: 2, h: 2, label: 'tiktok', link: 'https://tt.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#9C27B0' },
+      { w: 3, h: 2, label: 'spotify', link: 'https://sp.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#4CAF50' },
+      { w: 3, h: 2, label: 'tools', link: 'https://it.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#FFC107' },
+      { w: 2, h: 2, label: 'save', link: 'https://save.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#E91E63' },
+      { w: 2, h: 2, label: 'free', link: 'https://free.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#00BCD4' },
+      { w: 2, h: 2, label: 'jpg', link: 'https://jpg.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#673AB7' },
+      { w: 2, h: 2, label: 'pdf', link: 'https://pdf.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#795548' },
     ];
     
     const random = (s) => {
@@ -235,7 +232,7 @@ const layout = shuffleLayout();
   const borderColor = isDark ? '#444' : '#000';
   
   return (
-    <div style={{ height: '100vh', background: bg, padding: '0 10px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ minHeight: '100vh', height: '100%', background: bg, padding: '0 10px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <header style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
