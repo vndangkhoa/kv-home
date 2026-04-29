@@ -113,6 +113,7 @@ function TetrisPiece({ piece, isDark }) {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
+        onTouchEnd={handleClick}
       >
         <a 
           href={piece.link} 
