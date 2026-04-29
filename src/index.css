@@ -197,6 +197,9 @@ body {
       opacity: 0;
     }
   }
+  .tetris-board > div {
+    animation-duration: 0.5s, 5s !important;
+  }
 }
 
 @keyframes dropIn {
