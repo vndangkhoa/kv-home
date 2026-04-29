@@ -45,12 +45,15 @@ function TetrisPiece({ piece, isDark }) {
   };
   
   // For desktop: start gray, show hover color when hovering
-// For mobile: use actual color (will be animated)
+// For mobile dark: use colorDark for less gray
+// For mobile light: use actual color
 const bgColor = piece.label === 'cv' 
   ? piece.color 
-  : (isDark || isMobile) 
-    ? (color !== null && color !== undefined ? color : piece.color) 
-    : '#cccccc'; // Start gray for desktop
+  : (isMobile && isDark) 
+    ? (color || piece.colorDark || piece.color) 
+    : (isMobile) 
+      ? (color || piece.color)
+      : '#cccccc'; // Start gray for desktop
   const rowDelay = (piece.startY * 10) + (piece.startX * 2);  // Stagger based on both X and Y position
   const textColor = '#ffffff';
   const isStatic = piece.label === 'cv' || piece.featured;
