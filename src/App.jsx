@@ -11,17 +11,30 @@ function getRandomColor(isDark) {
 function TetrisPiece({ piece, isDark }) {
   const [color, setColor] = useState(null);
   const [showText, setShowText] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 500);
   const isCV = piece.label === 'cv';
   const isFeatured = piece.featured;
-  const alwaysShowText = true;
+      const alwaysShowText = true;
+ 
+  // Update mobile state on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 500);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   const handleMouseEnter = () => {
     if (!isCV) setColor(piece.hoverColor);
     setShowText(true);
+    setIsHovered(true);
   };
   const handleMouseLeave = () => {
     if (!isCV) setColor(null);
     setShowText(false);
+    setIsHovered(false);
   };
 
   const handleClick = (e) => {
@@ -31,8 +44,9 @@ function TetrisPiece({ piece, isDark }) {
     }
   };
   
-  const bgColor = piece.label === 'cv' ? piece.color : (piece.blinkColor || piece.color);
-  const rowDelay = piece.startY * 4;
+  // Start with background color (will be overridden by animation for mobile)
+const bgColor = piece.label === 'cv' ? piece.color : (isDark ? piece.colorDark : piece.color);
+  const rowDelay = piece.startY * 8;
   const textColor = '#ffffff';
   const isStatic = piece.label === 'cv' || piece.featured;
   
@@ -47,10 +61,14 @@ function TetrisPiece({ piece, isDark }) {
     animationFillMode: 'forwards',
   };
 
-  const bgStyle = {
+  // For desktop: use hoverColor when hovering, otherwise gray
+// For mobile: use blinkColor for animation (will start dim via animation)
+const bgStyle = {
     position: 'absolute',
     inset: 0,
-    backgroundColor: color || bgColor,
+    backgroundColor: isDark || isMobile 
+      ? (color || bgColor)  // Use actual color for blink animation
+      : (isHovered ? (piece.hoverColor || color) : '#cccccc'), // Hover color or gray
     transition: 'background-color 0.15s ease',
   };
 

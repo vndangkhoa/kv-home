@@ -203,7 +203,8 @@ body {
       opacity: 0.15;
     }
   }
-  .tetris-board > div {
+  /* Only apply duration override to elements that have both dropIn and blink animations */
+.tetris-board > div:not([style*="dropIn 0.5s ease-out forwards"]) {
     animation-duration: 0.5s, 8s !important;
   }
 }
