@@ -45,17 +45,21 @@ function TetrisPiece({ piece, isDark }) {
     }
   };
   
-  // For static pieces (CV, Portfolio): show actual color immediately
-// For desktop non-static: start gray, show hover color when hovering
-// For mobile dark: use colorDark for less gray
-// For mobile light: use actual color
-const bgColor = (piece.label === 'cv' || isStatic) 
-  ? piece.color 
-  : (isMobile && isDark) 
-    ? (color || piece.colorDark || piece.color) 
-    : (isMobile) 
-      ? (color || piece.color)
-      : '#cccccc'; // Start gray for desktop only
+  // Determine background color based on piece type and view
+let bgColor;
+if (piece.label === 'cv' || piece.label === 'portfolio' || piece.featured) {
+  // Static pieces (CV, Portfolio): show actual color immediately
+  bgColor = piece.color;
+} else if (isMobile && isDark) {
+  // Mobile dark: use colorDark or actual color
+  bgColor = color || piece.colorDark || piece.color;
+} else if (isMobile) {
+  // Mobile light: use actual color (with hover)
+  bgColor = color || piece.color;
+} else {
+  // Desktop: start gray, show hover color when hovering
+  bgColor = '#cccccc';
+}
   const rowDelay = (piece.startY * 10) + (piece.startX * 2);  // Stagger based on both X and Y position
   const textColor = '#ffffff';
   
