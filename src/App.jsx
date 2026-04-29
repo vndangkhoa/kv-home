@@ -16,7 +16,8 @@ function TetrisPiece({ piece, isDark }) {
   const isCV = piece.label === 'cv';
   const isFeatured = piece.featured;
       const alwaysShowText = true;
- 
+  const isStatic = piece.label === 'cv' || piece.featured;
+  
   // Update mobile state on resize
   useEffect(() => {
     const handleResize = () => {
@@ -59,7 +60,6 @@ const bgColor = piece.label === 'cv'
         : '#cccccc'; // Start gray for desktop only
   const rowDelay = (piece.startY * 10) + (piece.startX * 2);  // Stagger based on both X and Y position
   const textColor = '#ffffff';
-  const isStatic = piece.label === 'cv' || piece.featured;
   
   const containerStyle = {
     gridColumn: `${piece.startX + 1} / span ${piece.w}`,
