@@ -23,6 +23,12 @@ function TetrisPiece({ piece, isDark }) {
     if (!isCV) setColor(null);
     setShowText(false);
   };
+
+  const handleClick = () => {
+    if (piece.link) {
+      window.open(piece.link, '_blank', 'noopener,noreferrer');
+    }
+  };
   
   const bgColor = piece.label === 'cv' ? piece.color : piece.color;
   const rowDelay = piece.startY * 4;
@@ -45,7 +51,6 @@ function TetrisPiece({ piece, isDark }) {
     inset: 0,
     backgroundColor: color || bgColor,
     transition: 'background-color 0.15s ease',
-    pointerEvents: 'none',
   };
 
   const textStyle = {
@@ -59,7 +64,6 @@ function TetrisPiece({ piece, isDark }) {
     opacity: alwaysShowText ? 1 : (showText ? 1 : 0),
     transition: 'opacity 0.15s ease, color 0.15s ease',
     zIndex: 1,
-    pointerEvents: 'none',
   };
   
   const className = 'tetris-piece show';
@@ -108,6 +112,7 @@ function TetrisPiece({ piece, isDark }) {
         style={containerStyle}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
       >
         <a 
           href={piece.link} 
