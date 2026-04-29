@@ -1,127 +1,306 @@
-import React, { useState } from 'react';
-import { links, groups } from './data/links';
-import Header from './components/Header';
-import DotDivider from './components/DotDivider';
-import Section from './components/Section';
-import PortalCard from './components/PortalCard';
-import { Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 
-// Interactive blueprint components
-import PrimaryBlueprint from './components/illustrations/PrimaryBlueprint';
-import MediaBlueprint from './components/illustrations/MediaBlueprint';
-import MaintenanceBlueprint from './components/illustrations/MaintenanceBlueprint';
-import DevToolsBlueprint from './components/illustrations/DevToolsBlueprint';
+const COLORS_LIGHT = ['#7DD3D8', '#4A7BC7', '#F5A623', '#FFDC00', '#4CAF50', '#9C27B0', '#DC143C'];
+const COLORS_DARK = ['#5AA0A5', '#3A6294', '#C88820', '#C8B000', '#3E8A40', '#7A2090', '#A01030'];
+
+function getRandomColor(isDark) {
+  const colors = isDark ? COLORS_DARK : COLORS_LIGHT;
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
+function TetrisPiece({ piece, isDark }) {
+  const [color, setColor] = useState(null);
+  const [showText, setShowText] = useState(false);
+  const isCV = piece.label === 'cv';
+  const isFeatured = piece.featured;
+  const alwaysShowText = true;
+  
+  const handleMouseEnter = () => {
+    if (!isCV) setColor(piece.hoverColor);
+    setShowText(true);
+  };
+  const handleMouseLeave = () => {
+    if (!isCV) setColor(null);
+    setShowText(false);
+  };
+  
+  const bgColor = piece.label === 'cv' ? piece.color : piece.color;
+  const rowDelay = piece.startY * 4;
+  
+  const style = {
+    gridColumn: `${piece.startX + 1} / span ${piece.w}`,
+    gridRow: `${piece.startY + 1} / span ${piece.h}`,
+    backgroundColor: color || bgColor,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    aspectRatio: '1',
+    transition: 'background 0.15s ease',
+    cursor: piece.link ? 'pointer' : 'default',
+    overflow: 'hidden',
+    position: 'relative',
+    animation: `dropIn 0.5s ease-out forwards, colorBlink 5s ease-in-out ${rowDelay}s infinite`,
+    animationFillMode: 'forwards, none',
+  };
+  
+  const className = 'tetris-piece show';
+  
+  // CV block shows looping video
+  if (isCV) {
+    return (
+      <a 
+        href={piece.link} 
+        target="_blank" 
+        rel="noopener"
+        className={className}
+        style={style}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            opacity: 1,
+            transition: 'opacity 0.15s ease',
+            border: 'none',
+            outline: 'none',
+          }}
+        >
+          <source src="/cv-video.mp4" type="video/mp4" />
+        </video>
+        <span style={{
+          position: 'absolute',
+          bottom: '8px',
+          left: '8px',
+          fontSize: 'clamp(8px, 1.5vw, 12px)',
+          fontWeight: '500',
+          textTransform: 'lowercase',
+          color: '#fff',
+          opacity: 1,
+          transition: 'opacity 0.15s ease',
+        }}>
+          {piece.label}
+        </span>
+      </a>
+    );
+  }
+  
+  // Text only shows on hover, positioned at bottom left
+  const textStyle = {
+    fontSize: 'clamp(8px, 1.5vw, 12px)',
+    fontWeight: '500',
+    textTransform: 'lowercase',
+    color: alwaysShowText ? '#fff' : '#000',
+    opacity: alwaysShowText ? 1 : (showText ? 1 : 0),
+    transition: 'opacity 0.15s ease',
+    position: 'absolute',
+    bottom: '8px',
+    left: '8px',
+  };
+  
+  const wrapperStyle = {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+  };
+  
+  if (piece.link) {
+    return (
+      <a 
+        href={piece.link} 
+        target="_blank" 
+        rel="noopener"
+        className={className}
+        style={style}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <div style={wrapperStyle}>
+          <span style={textStyle}>{piece.label}</span>
+        </div>
+      </a>
+    );
+  }
+  
+  return (
+    <div 
+      className={className}
+      style={style}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div style={wrapperStyle}>
+        <span style={{...textStyle, cursor: 'default'}}>{piece.label}</span>
+      </div>
+    </div>
+  );
+}
 
 function App() {
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Enhanced links with categories and colors for the MakingSoftware look
-  const enhancedLinks = links.map(link => {
-    let color = '#3147ba'; // Primary Blue
-    
-    if (link.group === 'entertainment') {
-      color = '#ec4899';
-    } else if (link.group === 'dev') {
-      color = '#10b981';
-    } else if (link.group === 'rm8pfix-vn') {
-      color = '#f59e0b';
-    }
-
-    return {
-      ...link,
-      color
-    };
+  const [isDark, setIsDark] = useState(() => {
+    const hour = new Date().getHours();
+    return hour < 6 || hour >= 18;
   });
-
-  const filteredLinks = enhancedLinks.filter(link => 
-    link.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    link.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  return (
-    <div className="min-h-screen bg-white">
-      <Header />
+  const [seed, setSeed] = useState(() => Math.random());
+  
+  const shuffleLayout = () => {
+    const items = [
+      { w: 4, h: 1, label: 'rm8pfix', link: 'https://rm8pfix.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#00BCD4' },
+      { w: 2, h: 2, label: 'netflix', link: 'https://nf.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#FF9800' },
+      { w: 2, h: 3, label: 'portfolio', link: 'https://portfolio.khoavo.myds.me', featured: true, color: '#4A7BC7', hoverColor: '#2196F3' },
+      { w: 2, h: 3, label: 'cv', link: 'https://cv.khoavo.myds.me', color: '#616161', hoverColor: '#424242' },
+      { w: 2, h: 2, label: 'youtube', link: 'https://ut.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#FF5722' },
+      { w: 2, h: 2, label: 'tiktok', link: 'https://tt.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#9C27B0' },
+      { w: 3, h: 2, label: 'spotify', link: 'https://sp.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#4CAF50' },
+      { w: 3, h: 2, label: 'tools', link: 'https://it.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#FFC107' },
+      { w: 2, h: 2, label: 'save', link: 'https://save.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#E91E63' },
+      { w: 2, h: 2, label: 'free', link: 'https://free.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#00BCD4' },
+      { w: 2, h: 2, label: 'jpg', link: 'https://jpg.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#673AB7' },
+      { w: 2, h: 2, label: 'pdf', link: 'https://pdf.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#795548' },
+    ];
+    
+    const random = (s) => {
+      const x = Math.sin(s * 9999) * 10000;
+      return x - Math.floor(x);
+    };
+    
+    // Sort items by size (larger first) to make placement easier
+    const sortedItems = [...items].sort((a, b) => (b.w * b.h) - (a.w * a.h));
+    
+    // Shuffle the sorted items
+    for (let i = sortedItems.length - 1; i > 0; i--) {
+      const j = Math.floor(random(seed + i * 100) * (i + 1));
+      [sortedItems[i], sortedItems[j]] = [sortedItems[j], sortedItems[i]];
+    }
+    
+    const gridRows = 10;
+    const gridCols = 10;
+    const grid = Array(gridRows).fill(null).map(() => Array(gridCols).fill(0));
+    const placed = [];
+    
+    for (const item of sortedItems) {
+      let fits = false;
+      let bestPos = null;
+      let minOverlap = Infinity;
       
-      <main>
-        {groups.map((group, groupIndex) => {
-          const groupLinks = filteredLinks
-            .filter(link => link.group === group.id)
-            .sort((a, b) => a.order - b.order);
-          
-          if (groupLinks.length === 0) return null;
+      // Try many random positions
+      for (let attempt = 0; attempt < 500; attempt++) {
+        const r1 = random(seed + attempt * 7 + item.label.charCodeAt(0));
+        const r2 = random(seed + attempt * 13 + item.label.charCodeAt(0));
+        const row = Math.floor(r1 * (gridRows - item.h + 1));
+        const col = Math.floor(r2 * (gridCols - item.w + 1));
+        
+        // Check if this position works
+        let canPlace = true;
+        let overlap = 0;
+        for (let rr = row; rr < row + item.h && canPlace; rr++) {
+          for (let cc = col; cc < col + item.w && canPlace; cc++) {
+            if (grid[rr] && grid[rr][cc] === 1) {
+              canPlace = false;
+            }
+          }
+        }
+        
+        if (canPlace) {
+          for (let rr = row; rr < row + item.h; rr++) {
+            for (let cc = col; cc < col + item.w; cc++) {
+              grid[rr][cc] = 1;
+            }
+          }
+          placed.push({ ...item, startX: col, startY: row });
+          fits = true;
+          break;
+        }
+      }
+    }
+    
+    return placed;
+  };
+  
+const layout = shuffleLayout();
+  const sortedLayout = [...layout].sort((a, b) => b.startY - a.startY);
+  
+  const toggleTheme = () => setIsDark(!isDark);
+  const refreshLayout = () => setSeed(Math.random());
+  
+  const bg = isDark ? '#1a1a1a' : '#ffffff';
+  const headerBg = isDark ? '#1a1a1a' : '#ffffff';
+  const textColor = isDark ? '#fff' : '#000';
+  const borderColor = isDark ? '#444' : '#000';
+  
+  return (
+    <div style={{ height: '100vh', background: bg, padding: '0 10px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <header style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        padding: '8px 12px',
+        background: headerBg,
+        flexWrap: 'wrap',
+        gap: '8px',
+        flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
+          <a href="/" style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>Khoa.vo</a>
+          <span style={{ fontSize: '10px', color: isDark ? '#666' : '#999' }} className="header-tagline">where design meets intelligence</span>
+        </div>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button 
+            onClick={refreshLayout}
+            style={{
+              background: 'none',
+              border: `1px solid ${borderColor}`,
+              padding: '8px 12px',
+              fontSize: '14px',
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              color: textColor,
+              touchAction: 'manipulation',
+            }}
+          >
+            ↻
+          </button>
+          <button 
+            onClick={toggleTheme}
+            style={{
+              background: 'none',
+              border: `1px solid ${borderColor}`,
+              padding: '8px 12px',
+              fontSize: '14px',
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              color: textColor,
+              touchAction: 'manipulation',
+            }}
+          >
+            {isDark ? '☀' : '☾'}
+          </button>
+        </div>
+      </header>
 
-          const isPrimary = group.id === 'primary';
-
-          return (
-            <React.Fragment key={group.id}>
-              <Section 
-                title={group.title} 
-                description={group.description}
-                index={groupIndex}
-                isFeatured={isPrimary && !searchQuery}
-                featuredImage={
-                  group.id === 'primary' ? <PrimaryBlueprint /> :
-                  group.id === 'entertainment' ? <MediaBlueprint /> :
-                  group.id === 'rm8pfix-vn' ? <MaintenanceBlueprint /> :
-                  <DevToolsBlueprint />
-                }
-              >
-                {groupLinks.map((link, linkIndex) => (
-                  <PortalCard 
-                    key={link.id} 
-                    item={link} 
-                    index={linkIndex} 
-                  />
-                ))}
-              </Section>
-
-              {/* Position Search Bar immediately after the Primary Featured section */}
-              {isPrimary && (
-                <div className="ms-container pt-0 pb-1 md:pb-2">
-                  <div className="mb-1"><DotDivider /></div>
-                  <div className="relative group max-w-md">
-                    <div className="absolute -left-4 top-1/2 -translate-y-1/2 font-mono text-[10px] text-blue-600 font-bold vertical-text hidden md:block">
-                      SEARCH
-                    </div>
-                    <div className="flex items-center gap-2 border-b-2 border-black pb-2 focus-within:border-blue-600 transition-colors">
-                      <Search className="text-gray-300 group-focus-within:text-blue-600 shrink-0" size={16} />
-                      <input 
-                        type="text" 
-                        placeholder="FIND SYSTEM ACCESS..." 
-                        className="w-full bg-transparent font-pixel text-[13px] md:text-sm focus:outline-none placeholder:text-gray-200"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {groupIndex < groups.length - 1 && !isPrimary && <div className="mt-1"><DotDivider /></div>}
-            </React.Fragment>
-          );
-        })}
-
-        {searchQuery && filteredLinks.length === 0 && (
-          <div className="text-center py-12 px-4">
-            <p className="font-pixel text-[10px] md:text-xs text-gray-300 uppercase tracking-widest">[ ERROR: NO ACCESS MATCHED ]</p>
-          </div>
-        )}
+      <main className="tetris-board" key={seed} style={{ background: isDark ? '#222' : '#fff', flex: '1 1 auto', minHeight: 0 }}>
+        {sortedLayout.map((piece, idx) => (
+          <TetrisPiece key={piece.label} piece={piece} isDark={isDark} />
+        ))}
       </main>
 
-      <footer className="ms-container border-t border-gray-100 mt-2 md:mt-4 pb-12 flex flex-col md:flex-row justify-between items-center md:items-end gap-8">
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <h2 className="font-pixel text-blue-600 text-xs md:text-sm">VNDANGKHOA_PORTAL</h2>
-        </div>
-        
-        <div className="text-center md:text-right w-full md:w-auto">
-          <p className="font-serif text-[10px] md:text-[11px] font-bold text-gray-900 italic">
-            "Software engineering is the most important trade of the 21st century."
-          </p>
-          <p className="font-mono text-[9px] text-gray-400 mt-2 tracking-widest">
-             © {new Date().getFullYear()} REPRODUCED PIXEL PERFECT
-          </p>
-        </div>
+      <footer style={{ 
+        padding: '8px 20px', 
+        fontSize: '10px', 
+        color: isDark ? '#888' : '#666',
+        width: '100%',
+        maxWidth: '500px',
+        margin: '0 auto',
+        textAlign: 'center',
+        flexShrink: 0,
+      }}>
+        <p>© {new Date().getFullYear()} — Khoa.vo</p>
       </footer>
     </div>
   );
