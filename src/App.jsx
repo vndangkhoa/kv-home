@@ -153,18 +153,18 @@ function App() {
   
   const shuffleLayout = () => {
     const items = [
-      { w: 4, h: 1, label: 'rm8pfix', link: 'https://rm8pfix.khoavo.myds.me', color: '#E8E8E8', colorDark: '#333333', hoverColor: '#00BCD4', blinkColor: '#00BCD4' },
-      { w: 2, h: 2, label: 'netflix', link: 'https://nf.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#FF9800', blinkColor: '#FF9800' },
-      { w: 2, h: 3, label: 'portfolio', link: 'https://portfolio.khoavo.myds.me', featured: true, color: '#4A7BC7', colorDark: '#2d4a7c', hoverColor: '#2196F3', blinkColor: '#4A7BC7' },
-      { w: 2, h: 3, label: 'cv', link: 'https://cv.khoavo.myds.me', color: '#616161', colorDark: '#424242', hoverColor: '#424242', blinkColor: '#616161' },
-      { w: 2, h: 2, label: 'youtube', link: 'https://ut.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#FF5722', blinkColor: '#FF5722' },
-      { w: 2, h: 2, label: 'tiktok', link: 'https://tt.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#9C27B0', blinkColor: '#9C27B0' },
-      { w: 3, h: 2, label: 'spotify', link: 'https://sp.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#4CAF50', blinkColor: '#4CAF50' },
-      { w: 3, h: 2, label: 'tools', link: 'https://it.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#FFC107', blinkColor: '#FFC107' },
-      { w: 2, h: 2, label: 'save', link: 'https://save.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#E91E63', blinkColor: '#E91E63' },
-      { w: 2, h: 2, label: 'free', link: 'https://free.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#00BCD4', blinkColor: '#00BCD4' },
-      { w: 2, h: 2, label: 'jpg', link: 'https://jpg.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#673AB7', blinkColor: '#673AB7' },
-      { w: 2, h: 2, label: 'pdf', link: 'https://pdf.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#795548', blinkColor: '#795548' },
+      { w: 4, h: 1, label: 'rm8pfix', link: 'https://rm8pfix.khoavo.myds.me', color: '#E8E8E8', colorDark: '#333333', hoverColor: '#00BCD4', blinkColor: '#6DD5D6' },
+      { w: 2, h: 2, label: 'netflix', link: 'https://nf.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#FF9800', blinkColor: '#E6A84A' },
+      { w: 2, h: 3, label: 'portfolio', link: 'https://portfolio.khoavo.myds.me', featured: true, color: '#4A7BC7', colorDark: '#2d4a7c', hoverColor: '#2196F3', blinkColor: '#6B8BC9' },
+      { w: 2, h: 3, label: 'cv', link: 'https://cv.khoavo.myds.me', color: '#616161', colorDark: '#424242', hoverColor: '#424242', blinkColor: '#888888' },
+      { w: 2, h: 2, label: 'youtube', link: 'https://ut.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#FF5722', blinkColor: '#D97856' },
+      { w: 2, h: 2, label: 'tiktok', link: 'https://tt.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#9C27B0', blinkColor: '#B87ABF' },
+      { w: 3, h: 2, label: 'spotify', link: 'https://sp.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#4CAF50', blinkColor: '#78B578' },
+      { w: 3, h: 2, label: 'tools', link: 'https://it.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#FFC107', blinkColor: '#E6C449' },
+      { w: 2, h: 2, label: 'save', link: 'https://save.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#E91E63', blinkColor: '#D0648A' },
+      { w: 2, h: 2, label: 'free', link: 'https://free.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#00BCD4', blinkColor: '#6DD5D6' },
+      { w: 2, h: 2, label: 'jpg', link: 'https://jpg.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#673AB7', blinkColor: '#9A88BF' },
+      { w: 2, h: 2, label: 'pdf', link: 'https://pdf.khoavo.myds.me', color: '#E8E8E8', colorDark: '#3a3a3a', hoverColor: '#795548', blinkColor: '#A6917C' },
     ];
     
     const random = (s) => {
