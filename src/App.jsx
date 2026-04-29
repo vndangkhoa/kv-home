@@ -24,9 +24,7 @@ function TetrisPiece({ piece, isDark }) {
     setShowText(false);
   };
   
-  const bgColor = piece.label === 'cv' 
-    ? piece.color 
-    : (isDark ? piece.colorDark : piece.color);
+  const bgColor = piece.label === 'cv' ? piece.color : piece.color;
   const rowDelay = piece.startY * 4;
   const textColor = '#ffffff';
   const isStatic = piece.label === 'cv' || piece.featured;
