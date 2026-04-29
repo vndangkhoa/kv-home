@@ -182,19 +182,25 @@ body {
 
 @media (max-width: 500px) {
   @keyframes blink {
-    0%, 100% { 
+    0%, 5% { 
       opacity: 1;
     }
-    50% { 
-      opacity: 0;
+    10%, 95% { 
+      opacity: 0.15;
+    }
+    100% { 
+      opacity: 1;
     }
   }
   @-webkit-keyframes blink {
-    0%, 100% { 
+    0%, 5% { 
       opacity: 1;
     }
-    50% { 
-      opacity: 0;
+    10%, 95% { 
+      opacity: 0.15;
+    }
+    100% { 
+      opacity: 1;
     }
   }
   .tetris-board > div {
