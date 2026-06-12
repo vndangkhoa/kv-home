@@ -69,30 +69,33 @@ a { color: inherit; text-decoration: none; }
 
 .tetris-board {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  grid-template-rows: repeat(10, 1fr);
-  align-content: end;
-  gap: 1px;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(6, 1fr);
+  --grid-gap: 2px;
+  gap: var(--grid-gap);
   width: 100%;
-  max-width: 500px;
-  margin: 10px auto;
-  padding: 0 10px;
+  height: auto;
+  aspect-ratio: auto;
+  flex-grow: 1;
+  margin: 0 auto;
+  padding: 0;
   background: var(--bg-board);
   contain: layout;
-  aspect-ratio: 10 / 10;
 }
 
 @media (max-width: 600px) {
   .tetris-board {
-    max-width: calc(100vw - 20px);
-    gap: 0.5px;
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    --grid-gap: 1px;
+    gap: var(--grid-gap);
   }
 }
 
 @media (max-width: 400px) {
   .tetris-board {
-    gap: 0;
-    padding: 0 4px;
+    gap: 1px;
+    padding: 0;
   }
   .tetris-piece {
     border: none !important;
@@ -140,10 +143,6 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  transition: background 0.15s ease;
-  opacity: 0;
-  animation: dropIn 0.5s ease-out forwards;
-  animation-fill-mode: forwards;
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
@@ -157,63 +156,22 @@ body {
   box-shadow: none !important;
 }
 
-.tetris-piece.show {
-  animation: dropIn 0.5s ease-out forwards;
-  animation-fill-mode: forwards;
-}
-
-@keyframes blink {
-  0%, 100% { 
-    opacity: 1;
-  }
-  50% { 
-    opacity: 0;
-  }
-}
-
-@-webkit-keyframes blink {
-  0%, 100% { 
-    opacity: 1;
-  }
-  50% { 
-    opacity: 0;
-  }
-}
-
-@media (max-width: 500px) {
-  @keyframes blink {
-    0%, 3% { 
-      opacity: 0.15;
-    }
-    8%, 12% { 
-      opacity: 1;
-    }
-    18%, 100% { 
-      opacity: 0.15;
-    }
-  }
-  @-webkit-keyframes blink {
-    0%, 3% { 
-      opacity: 0.15;
-    }
-    8%, 12% { 
-      opacity: 1;
-    }
-    18%, 100% { 
-      opacity: 0.15;
-    }
-  }
-  /* Only apply duration override to elements that have both dropIn and blink animations */
-.tetris-board > div:not([style*="dropIn 0.5s ease-out forwards"]) {
-    animation-duration: 0.5s, 8s !important;
-  }
-}
-
-@keyframes dropIn {
+@keyframes tetrisFall {
   0% {
+    transform: translateY(-100vh);
     opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(0);
+  }
+  88% {
+    transform: translateY(-8px);
   }
   100% {
+    transform: translateY(0);
     opacity: 1;
   }
 }
@@ -226,4 +184,13 @@ body {
   margin: 0 auto;
   text-align: center;
   margin-top: auto;
+}
+
+@keyframes colorBlink {
+  0%, 20%, 70%, 100% {
+    background-color: var(--dim-color);
+  }
+  40%, 50% {
+    background-color: var(--vibrant-color);
+  }
 }

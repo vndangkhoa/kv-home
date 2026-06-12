@@ -8,12 +8,13 @@ A responsive web portal that displays links in a tetris-inspired grid layout. Ea
 
 ## Features
 
-- **Tetris Grid Layout**: Blocks arrange themselves in a non-overlapping grid pattern
-- **Sequential Animation**: Blocks drop in one by one from top to bottom on refresh
-- **Row-based Color Blink**: Colors pulse row by row with a subtle breathing effect
-- **Mobile Responsive**: Optimized for mobile devices with touch-friendly buttons
-- **Dark/Light Theme**: Toggle between dark and light modes
-- **Refresh Layout**: Shuffle button to regenerate the grid layout
+- **Pixel-Perfect Seamless Blocks**: Tetromino blocks are rendered as single, continuous HTML elements clipped using SVG `clipPath` and extended using CSS `calc()`. This creates a solid block appearance with no internal borders or gaps, while maintaining perfectly even gaps between different blocks.
+- **Single CV Video Media**: The CV block displays a single looping video resume seamlessly clipped by the Tetris shape (no duplicate tiles).
+- **Global Height-Stretched Layout**: The grid maximizes vertical viewport space globally on both desktop and mobile by dynamically stretching to fill the remaining space between the header and footer with no scrollbars.
+- **Mobile Responsive Grid**: Swaps between an 8×6 grid layout (4:3 aspect ratio) on desktop and a portrait-oriented 6×8 grid layout (3:4 aspect ratio) on mobile.
+- **Staggered Blinking on Mobile**: On mobile viewports, blocks pulse gently in their signature vibrant colors with deterministic staggered delays, while CV and Portfolio stay static.
+- **Dark/Light Theme**: Toggle between dark and light modes.
+- **Refresh Layout**: Shuffle button to regenerate the grid layout.
 
 ## Links
 
