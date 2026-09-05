@@ -161,10 +161,11 @@ function generateTiling(cols, rows, numPieces, rng) {
 function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 500);
-  const isVideo = piece.isVideo || piece.label === 'cv';
-  const isFeatured = piece.featured;
+  const isVideo = !!(piece.isVideo || piece.label === 'cv');
+  const isFeatured = !!piece.featured;
   const isStatic = isVideo || isFeatured;
   const clipId = `clip-${piece.id || piece.label}-${fallIndex}`;
+  const videoSrc = piece.videoUrl || piece.videoSrc || '/cv-video.mp4';
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 500);
@@ -175,16 +176,22 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
   const handleMouseEnter = () => setIsHovered(true);
   const handleMouseLeave = () => setIsHovered(false);
 
+  const pieceColor = piece.color || piece.hoverColor || '#2196F3';
+  const pieceHoverColor = piece.hoverColor || piece.color || '#2196F3';
+
   // Color logic:
-  // Video / Featured: always their assigned color
-  // Regular: dim gray while resting → vibrant hoverColor on hover
+  // Video: transparent to show <video>
+  // Featured (Solid): always display its selected color
+  // Regular: dim gray while resting → vibrant color on hover
   let bgColor;
-  if (isStatic) {
-    bgColor = piece.color || (isFeatured ? '#4A7BC7' : '#616161');
+  if (isVideo) {
+    bgColor = 'transparent';
+  } else if (isFeatured) {
+    bgColor = pieceColor;
   } else if (isHovered) {
-    bgColor = piece.hoverColor || '#2196F3';
+    bgColor = pieceHoverColor;
   } else {
-    bgColor = isDark ? '#333' : '#e0e0e0';
+    bgColor = isDark ? '#333333' : '#e0e0e0';
   }
 
   const showText = isMobile ? allLanded : isHovered;
@@ -214,7 +221,7 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
         fontWeight: '500',
         textTransform: 'lowercase',
         color: '#fff',
-        zIndex: 1,
+        zIndex: 2,
         lineHeight: 1,
         whiteSpace: 'nowrap',
         pointerEvents: 'none',
@@ -236,15 +243,15 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
     position: 'relative',
     cursor: piece.link ? 'pointer' : 'default',
     backgroundColor: isVideo ? 'transparent' : bgColor,
-    transition: 'background-color 0.5s ease',
+    transition: 'background-color 0.4s ease',
     clipPath: `url(#${clipId})`,
     WebkitClipPath: `url(#${clipId})`,
     display: 'block',
     overflow: 'hidden',
     '--cell-w': `calc((100% - (${W} - 1) * var(--grid-gap, 2px)) / ${W})`,
     '--cell-h': `calc((100% - (${H} - 1) * var(--grid-gap, 2px)) / ${H})`,
-    '--vibrant-color': piece.hoverColor || '#2196F3',
-    '--dim-color': isDark ? '#333' : '#e0e0e0',
+    '--vibrant-color': pieceHoverColor,
+    '--dim-color': isFeatured ? pieceColor : (isDark ? '#333333' : '#e0e0e0'),
   };
 
   if (isMobile && allLanded && !isStatic) {
@@ -267,7 +274,7 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
       onMouseLeave={handleMouseLeave}
       {...linkProps}
     >
-      <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+      <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}>
         <defs>
           <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
             {piece.cells.map((cell, idx) => {
@@ -297,12 +304,6 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
                   y={ry}
                   width={rw}
                   height={rh}
-                  style={{
-                    x: rx,
-                    y: ry,
-                    width: rw,
-                    height: rh
-                  }}
                 />
               );
             })}
@@ -311,6 +312,8 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
       </svg>
       {isVideo && (
         <video
+          key={videoSrc}
+          src={videoSrc}
           autoPlay
           loop
           muted
@@ -323,10 +326,9 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
             inset: 0,
             border: 'none',
             outline: 'none',
+            zIndex: 1,
           }}
-        >
-          <source src="/cv-video.mp4" type="video/mp4" />
-        </video>
+        />
       )}
       {showText && (
         <div
@@ -337,6 +339,7 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
             width: `var(--cell-w)`,
             height: `var(--cell-h)`,
             pointerEvents: 'none',
+            zIndex: 2,
           }}
         >
           {labelContent}
@@ -381,7 +384,7 @@ function App() {
         }
       })
       .catch(() => {
-        // Backend not running / offline - use local state
+        // Backend offline / static mode - use local state
       });
   }, []);
 

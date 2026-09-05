@@ -6,6 +6,7 @@ import path from 'node:path'
 function apiPlugin() {
   const linksPath = path.resolve(__dirname, 'src/data/links.json')
   const authPath = path.resolve(__dirname, 'src/data/auth.json')
+  const uploadsDir = path.resolve(__dirname, 'public/uploads')
 
   const readLinks = () => {
     try {
@@ -63,6 +64,33 @@ function apiPlugin() {
         })
         return
       }
+    }
+
+    if (url === '/api/upload-video' && req.method === 'POST') {
+      let body = ''
+      req.on('data', (chunk) => { body += chunk })
+      req.on('end', () => {
+        try {
+          const { filename, base64Data } = JSON.parse(body)
+          if (!fs.existsSync(uploadsDir)) {
+            fs.mkdirSync(uploadsDir, { recursive: true })
+          }
+          const cleanName = (filename || 'video.mp4').replace(/[^a-zA-Z0-9._-]/g, '_')
+          const targetName = `${Date.now()}_${cleanName}`
+          const targetPath = path.join(uploadsDir, targetName)
+
+          const base64Clean = base64Data.replace(/^data:[^;]+;base64,/, '')
+          const buffer = Buffer.from(base64Clean, 'base64')
+          fs.writeFileSync(targetPath, buffer)
+
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ success: true, url: `/uploads/${targetName}` }))
+        } catch (e) {
+          res.statusCode = 500
+          res.end(JSON.stringify({ error: 'Failed to upload video: ' + e.message }))
+        }
+      })
+      return
     }
 
     if (url === '/api/auth/verify' && req.method === 'POST') {

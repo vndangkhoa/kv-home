@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const PRESET_COLORS = [
   '#00BCD4', '#FF9800', '#2196F3', '#FF5722', 
   '#9C27B0', '#4CAF50', '#FFC107', '#E91E63', 
   '#673AB7', '#795548', '#607D8B', '#3F51B5',
-  '#009688', '#E65100', '#1E88E5', '#8E24AA'
+  '#009688', '#E65100', '#1E88E5', '#8E24AA',
+  '#E91E63', '#00E676', '#FFD600', '#FF1744'
 ];
 
 export default function AdminModal({ 
@@ -22,18 +23,20 @@ export default function AdminModal({
   const [activeTab, setActiveTab] = useState('links'); // 'links' | 'password' | 'json'
   const [saveStatus, setSaveStatus] = useState('');
   const [jsonText, setJsonText] = useState('');
+  const [uploadingIdx, setUploadingIdx] = useState(null);
   
   // Password change state
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
   const [pwMessage, setPwMessage] = useState({ text: '', isError: false });
 
+  const fileInputRefs = useRef({});
+
   useEffect(() => {
     if (isOpen) {
       setItems(JSON.parse(JSON.stringify(links)));
       setSaveStatus('');
       setAuthError('');
-      // check if session already logged in in sessionStorage
       const sessionAuth = sessionStorage.getItem('kv_admin_auth');
       if (sessionAuth === 'true') {
         setIsAuthenticated(true);
@@ -48,7 +51,6 @@ export default function AdminModal({
     setAuthError('');
 
     try {
-      // Try backend API
       const res = await fetch('/api/auth/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -61,10 +63,9 @@ export default function AdminModal({
         return;
       }
     } catch (err) {
-      console.warn('API auth unavailable, trying local check');
+      console.warn('API auth unavailable, checking local');
     }
 
-    // Fallback local check
     const savedPw = localStorage.getItem('kv_admin_pw') || 'thieugia';
     if (password === savedPw) {
       setIsAuthenticated(true);
@@ -83,11 +84,66 @@ export default function AdminModal({
   const handleItemChange = (index, field, value) => {
     const updated = [...items];
     updated[index] = { ...updated[index], [field]: value };
-    // auto-sync title with label if title is empty
+    
     if (field === 'label' && !updated[index].title) {
       updated[index].title = value.toUpperCase();
     }
+    
+    // When changing hoverColor, sync color too so featured & hover colors both match
+    if (field === 'hoverColor') {
+      updated[index].color = value;
+    }
+    
+    // When toggling featured on, ensure color is set
+    if (field === 'featured' && value && !updated[index].color) {
+      updated[index].color = updated[index].hoverColor || '#2196F3';
+    }
+
     setItems(updated);
+  };
+
+  const handleColorSelect = (index, colorHex) => {
+    const updated = [...items];
+    updated[index] = {
+      ...updated[index],
+      hoverColor: colorHex,
+      color: colorHex
+    };
+    setItems(updated);
+  };
+
+  const handleVideoUpload = async (index, file) => {
+    if (!file) return;
+    setUploadingIdx(index);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64Data = e.target.result;
+      try {
+        const res = await fetch('/api/upload-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, base64Data }),
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          handleItemChange(index, 'videoUrl', result.url);
+          handleItemChange(index, 'isVideo', true);
+          setUploadingIdx(null);
+          return;
+        }
+      } catch (err) {
+        console.warn('Server upload failed, using local blob URL');
+      }
+
+      // Fallback: use object URL / base64 directly
+      handleItemChange(index, 'videoUrl', base64Data);
+      handleItemChange(index, 'isVideo', true);
+      setUploadingIdx(null);
+    };
+
+    reader.readAsDataURL(file);
   };
 
   const handleMove = (index, direction) => {
@@ -101,6 +157,7 @@ export default function AdminModal({
 
   const handleAddItem = () => {
     const nextId = items.length > 0 ? Math.max(...items.map(i => i.id || 0)) + 1 : 1;
+    const defaultColor = PRESET_COLORS[(items.length) % PRESET_COLORS.length];
     const newItem = {
       id: nextId,
       label: `app_${nextId}`,
@@ -108,10 +165,11 @@ export default function AdminModal({
       subtitle: 'Tool',
       link: 'https://',
       group: 'tools',
-      color: '#E8E8E8',
-      hoverColor: PRESET_COLORS[(items.length) % PRESET_COLORS.length],
+      color: defaultColor,
+      hoverColor: defaultColor,
       featured: false,
       isVideo: false,
+      videoUrl: ''
     };
     setItems([...items, newItem]);
   };
@@ -429,150 +487,167 @@ export default function AdminModal({
                   </div>
 
                   {/* Links List */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {items.map((item, idx) => (
-                      <div
-                        key={item.id || idx}
-                        style={{
-                          background: cardBg,
-                          border: `1px solid ${border}`,
-                          borderRadius: '6px',
-                          padding: '14px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '10px',
-                        }}
-                      >
-                        {/* Row 1: Order, Label, Title, Actions */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <div style={{ display: 'flex', gap: '2px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {items.map((item, idx) => {
+                      const currentColor = item.hoverColor || item.color || '#2196F3';
+                      const isItemVideo = !!(item.isVideo || item.label === 'cv');
+
+                      return (
+                        <div
+                          key={item.id || idx}
+                          style={{
+                            background: cardBg,
+                            border: `1px solid ${border}`,
+                            borderRadius: '6px',
+                            padding: '14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            position: 'relative',
+                          }}
+                        >
+                          {/* Row 1: Order, Label, Title, Actions */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', gap: '2px' }}>
+                              <button
+                                onClick={() => handleMove(idx, -1)}
+                                disabled={idx === 0}
+                                style={{
+                                  padding: '4px 6px',
+                                  background: isDark ? '#333' : '#ddd',
+                                  border: 'none',
+                                  borderRadius: '3px',
+                                  color: text,
+                                  cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                                  opacity: idx === 0 ? 0.3 : 1,
+                                  fontSize: '10px',
+                                }}
+                                title="Move Up"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                onClick={() => handleMove(idx, 1)}
+                                disabled={idx === items.length - 1}
+                                style={{
+                                  padding: '4px 6px',
+                                  background: isDark ? '#333' : '#ddd',
+                                  border: 'none',
+                                  borderRadius: '3px',
+                                  color: text,
+                                  cursor: idx === items.length - 1 ? 'not-allowed' : 'pointer',
+                                  opacity: idx === items.length - 1 ? 0.3 : 1,
+                                  fontSize: '10px',
+                                }}
+                                title="Move Down"
+                              >
+                                ▼
+                              </button>
+                            </div>
+
+                            <span style={{ fontSize: '11px', fontWeight: 'bold', minWidth: '22px', color: subText }}>
+                              #{idx + 1}
+                            </span>
+
+                            {/* Color Preview Pill */}
+                            <div 
+                              style={{
+                                width: '16px',
+                                height: '16px',
+                                borderRadius: '50%',
+                                backgroundColor: isItemVideo ? '#9C27B0' : currentColor,
+                                border: '2px solid rgba(255,255,255,0.3)',
+                                flexShrink: 0
+                              }}
+                              title={isItemVideo ? 'Video Animation' : `Color: ${currentColor}`}
+                            />
+
+                            <div style={{ flex: 1, minWidth: '120px' }}>
+                              <label style={{ fontSize: '9px', color: subText, display: 'block', marginBottom: '2px' }}>
+                                TETRIS LABEL
+                              </label>
+                              <input
+                                type="text"
+                                value={item.label || ''}
+                                onChange={(e) => handleItemChange(idx, 'label', e.target.value.toLowerCase().replace(/\s+/g, ''))}
+                                placeholder="e.g. portfolio"
+                                style={{
+                                  width: '100%',
+                                  padding: '6px 8px',
+                                  borderRadius: '4px',
+                                  border: `1px solid ${inputBorder}`,
+                                  background: inputBg,
+                                  color: text,
+                                  fontSize: '11px',
+                                  fontFamily: 'inherit',
+                                }}
+                              />
+                            </div>
+
+                            <div style={{ flex: 1, minWidth: '120px' }}>
+                              <label style={{ fontSize: '9px', color: subText, display: 'block', marginBottom: '2px' }}>
+                                DISPLAY TITLE
+                              </label>
+                              <input
+                                type="text"
+                                value={item.title || ''}
+                                onChange={(e) => handleItemChange(idx, 'title', e.target.value)}
+                                placeholder="e.g. Portfolio"
+                                style={{
+                                  width: '100%',
+                                  padding: '6px 8px',
+                                  borderRadius: '4px',
+                                  border: `1px solid ${inputBorder}`,
+                                  background: inputBg,
+                                  color: text,
+                                  fontSize: '11px',
+                                  fontFamily: 'inherit',
+                                }}
+                              />
+                            </div>
+
+                            <div style={{ flex: 1, minWidth: '100px' }}>
+                              <label style={{ fontSize: '9px', color: subText, display: 'block', marginBottom: '2px' }}>
+                                SUBTITLE / TAG
+                              </label>
+                              <input
+                                type="text"
+                                value={item.subtitle || ''}
+                                onChange={(e) => handleItemChange(idx, 'subtitle', e.target.value)}
+                                placeholder="e.g. Streaming"
+                                style={{
+                                  width: '100%',
+                                  padding: '6px 8px',
+                                  borderRadius: '4px',
+                                  border: `1px solid ${inputBorder}`,
+                                  background: inputBg,
+                                  color: text,
+                                  fontSize: '11px',
+                                  fontFamily: 'inherit',
+                                }}
+                              />
+                            </div>
+
                             <button
-                              onClick={() => handleMove(idx, -1)}
-                              disabled={idx === 0}
+                              onClick={() => handleDeleteItem(idx)}
                               style={{
-                                padding: '4px 6px',
-                                background: isDark ? '#333' : '#ddd',
-                                border: 'none',
-                                borderRadius: '3px',
-                                color: text,
-                                cursor: idx === 0 ? 'not-allowed' : 'pointer',
-                                opacity: idx === 0 ? 0.3 : 1,
-                                fontSize: '10px',
+                                padding: '6px 10px',
+                                background: '#ffebee',
+                                color: '#c62828',
+                                border: '1px solid #ffcdd2',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                cursor: 'pointer',
+                                alignSelf: 'flex-end',
                               }}
-                              title="Move Up"
+                              title="Delete Link"
                             >
-                              ▲
-                            </button>
-                            <button
-                              onClick={() => handleMove(idx, 1)}
-                              disabled={idx === items.length - 1}
-                              style={{
-                                padding: '4px 6px',
-                                background: isDark ? '#333' : '#ddd',
-                                border: 'none',
-                                borderRadius: '3px',
-                                color: text,
-                                cursor: idx === items.length - 1 ? 'not-allowed' : 'pointer',
-                                opacity: idx === items.length - 1 ? 0.3 : 1,
-                                fontSize: '10px',
-                              }}
-                              title="Move Down"
-                            >
-                              ▼
+                              🗑
                             </button>
                           </div>
 
-                          <span style={{ fontSize: '11px', fontWeight: 'bold', minWidth: '22px', color: subText }}>
-                            #{idx + 1}
-                          </span>
-
-                          <div style={{ flex: 1, minWidth: '130px' }}>
-                            <label style={{ fontSize: '9px', color: subText, display: 'block', marginBottom: '2px' }}>
-                              TETRIS LABEL (lowercase)
-                            </label>
-                            <input
-                              type="text"
-                              value={item.label || ''}
-                              onChange={(e) => handleItemChange(idx, 'label', e.target.value.toLowerCase().replace(/\s+/g, ''))}
-                              placeholder="e.g. portfolio"
-                              style={{
-                                width: '100%',
-                                padding: '6px 8px',
-                                borderRadius: '4px',
-                                border: `1px solid ${inputBorder}`,
-                                background: inputBg,
-                                color: text,
-                                fontSize: '11px',
-                                fontFamily: 'inherit',
-                              }}
-                            />
-                          </div>
-
-                          <div style={{ flex: 1, minWidth: '130px' }}>
-                            <label style={{ fontSize: '9px', color: subText, display: 'block', marginBottom: '2px' }}>
-                              DISPLAY TITLE
-                            </label>
-                            <input
-                              type="text"
-                              value={item.title || ''}
-                              onChange={(e) => handleItemChange(idx, 'title', e.target.value)}
-                              placeholder="e.g. Portfolio"
-                              style={{
-                                width: '100%',
-                                padding: '6px 8px',
-                                borderRadius: '4px',
-                                border: `1px solid ${inputBorder}`,
-                                background: inputBg,
-                                color: text,
-                                fontSize: '11px',
-                                fontFamily: 'inherit',
-                              }}
-                            />
-                          </div>
-
-                          <div style={{ flex: 1, minWidth: '100px' }}>
-                            <label style={{ fontSize: '9px', color: subText, display: 'block', marginBottom: '2px' }}>
-                              SUBTITLE / TAG
-                            </label>
-                            <input
-                              type="text"
-                              value={item.subtitle || ''}
-                              onChange={(e) => handleItemChange(idx, 'subtitle', e.target.value)}
-                              placeholder="e.g. Streaming"
-                              style={{
-                                width: '100%',
-                                padding: '6px 8px',
-                                borderRadius: '4px',
-                                border: `1px solid ${inputBorder}`,
-                                background: inputBg,
-                                color: text,
-                                fontSize: '11px',
-                                fontFamily: 'inherit',
-                              }}
-                            />
-                          </div>
-
-                          <button
-                            onClick={() => handleDeleteItem(idx)}
-                            style={{
-                              padding: '6px 10px',
-                              background: '#ffebee',
-                              color: '#c62828',
-                              border: '1px solid #ffcdd2',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              cursor: 'pointer',
-                              alignSelf: 'flex-end',
-                            }}
-                            title="Delete Link"
-                          >
-                            🗑
-                          </button>
-                        </div>
-
-                        {/* Row 2: URL, Color Picker, Toggles */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                          <div style={{ flex: 2, minWidth: '220px' }}>
+                          {/* Row 2: Destination URL */}
+                          <div>
                             <label style={{ fontSize: '9px', color: subText, display: 'block', marginBottom: '2px' }}>
                               DESTINATION URL
                             </label>
@@ -594,53 +669,170 @@ export default function AdminModal({
                             />
                           </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <label style={{ fontSize: '9px', color: subText }}>
-                              HOVER COLOR
-                            </label>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <input
-                                type="color"
-                                value={item.hoverColor || '#00BCD4'}
-                                onChange={(e) => handleItemChange(idx, 'hoverColor', e.target.value)}
-                                style={{
-                                  width: '28px',
-                                  height: '28px',
-                                  padding: 0,
-                                  border: 'none',
-                                  borderRadius: '4px',
-                                  cursor: 'pointer',
-                                  background: 'none',
-                                }}
-                              />
-                              <span style={{ fontSize: '10px', color: subText, width: '60px' }}>
-                                {item.hoverColor || '#00BCD4'}
-                              </span>
+                          {/* Row 3: Color Palette & Special Modes */}
+                          <div style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '12px',
+                            background: isDark ? '#1f1f1f' : '#eeeeee',
+                            padding: '10px 12px',
+                            borderRadius: '5px'
+                          }}>
+                            {/* Color Selector */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <label style={{ fontSize: '9px', fontWeight: '600', color: subText }}>
+                                BLOCK COLOR PALETTE
+                              </label>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                {PRESET_COLORS.slice(0, 10).map((c) => (
+                                  <button
+                                    key={c}
+                                    type="button"
+                                    onClick={() => handleColorSelect(idx, c)}
+                                    style={{
+                                      width: '20px',
+                                      height: '20px',
+                                      borderRadius: '50%',
+                                      backgroundColor: c,
+                                      border: currentColor.toLowerCase() === c.toLowerCase() ? '2px solid #fff' : '1px solid rgba(0,0,0,0.2)',
+                                      boxShadow: currentColor.toLowerCase() === c.toLowerCase() ? '0 0 4px #fff' : 'none',
+                                      cursor: 'pointer',
+                                      padding: 0,
+                                    }}
+                                    title={`Select ${c}`}
+                                  />
+                                ))}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '6px' }}>
+                                  <input
+                                    type="color"
+                                    value={currentColor}
+                                    onChange={(e) => handleColorSelect(idx, e.target.value)}
+                                    style={{
+                                      width: '24px',
+                                      height: '24px',
+                                      padding: 0,
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      background: 'none',
+                                    }}
+                                    title="Custom Color"
+                                  />
+                                  <span style={{ fontSize: '10px', color: subText, fontFamily: 'monospace' }}>
+                                    {currentColor}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Toggles */}
+                            <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={!!item.featured}
+                                  onChange={(e) => handleItemChange(idx, 'featured', e.target.checked)}
+                                />
+                                <span title="Solid color continuously instead of dim resting state">
+                                  Solid Color (Featured)
+                                </span>
+                              </label>
+
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isItemVideo}
+                                  onChange={(e) => handleItemChange(idx, 'isVideo', e.target.checked)}
+                                />
+                                <span title="Render background video animation inside block">
+                                  📹 Video Block
+                                </span>
+                              </label>
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '14px' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', cursor: 'pointer' }}>
-                              <input
-                                type="checkbox"
-                                checked={!!item.featured}
-                                onChange={(e) => handleItemChange(idx, 'featured', e.target.checked)}
-                              />
-                              <span>Featured (Solid Color)</span>
-                            </label>
+                          {/* Row 4: Video Upload / URL (When Video is Enabled) */}
+                          {isItemVideo && (
+                            <div style={{
+                              background: isDark ? '#171717' : '#e8f0fe',
+                              border: `1px solid ${isDark ? '#333' : '#c2d7ff'}`,
+                              padding: '10px 12px',
+                              borderRadius: '5px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px',
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '10px', fontWeight: 'bold', color: isDark ? '#64b5f6' : '#1976d2' }}>
+                                  📹 VIDEO ANIMATION SETTINGS
+                                </span>
+                                {uploadingIdx === idx && (
+                                  <span style={{ fontSize: '10px', color: '#FF9800' }}>
+                                    Uploading video...
+                                  </span>
+                                )}
+                              </div>
 
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', cursor: 'pointer' }}>
-                              <input
-                                type="checkbox"
-                                checked={!!item.isVideo}
-                                onChange={(e) => handleItemChange(idx, 'isVideo', e.target.checked)}
-                              />
-                              <span>CV Video</span>
-                            </label>
-                          </div>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Video URL or path (e.g. /cv-video.mp4)"
+                                  value={item.videoUrl || (item.label === 'cv' ? '/cv-video.mp4' : '')}
+                                  onChange={(e) => handleItemChange(idx, 'videoUrl', e.target.value)}
+                                  style={{
+                                    flex: 1,
+                                    minWidth: '200px',
+                                    padding: '6px 8px',
+                                    borderRadius: '4px',
+                                    border: `1px solid ${inputBorder}`,
+                                    background: inputBg,
+                                    color: text,
+                                    fontSize: '11px',
+                                    fontFamily: 'inherit',
+                                  }}
+                                />
+
+                                <input
+                                  type="file"
+                                  accept="video/mp4,video/webm"
+                                  ref={(el) => (fileInputRefs.current[idx] = el)}
+                                  style={{ display: 'none' }}
+                                  onChange={(e) => {
+                                    if (e.target.files?.[0]) {
+                                      handleVideoUpload(idx, e.target.files[0]);
+                                    }
+                                  }}
+                                />
+
+                                <button
+                                  type="button"
+                                  onClick={() => fileInputRefs.current[idx]?.click()}
+                                  disabled={uploadingIdx === idx}
+                                  style={{
+                                    padding: '6px 12px',
+                                    background: '#2196F3',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '11px',
+                                    fontWeight: '500',
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                  }}
+                                >
+                                  📁 Upload MP4 / WebM
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </>
               )}
