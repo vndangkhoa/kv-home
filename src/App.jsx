@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { calculateOptimalGrid } from './utils/gridCalculator';
+import AdminModal from './components/AdminModal';
+import defaultLinksData from './data/links.json';
 
 const FALL_DURATION = 0.5;
 const FALL_STAGGER = 0.12;
@@ -49,13 +52,11 @@ function createRandom(seed) {
 }
 
 // Generate a perfect tetromino tiling using backtracking.
-// Finds the first empty cell, tries all 19 orientations (shuffled for variety),
-// places the piece, and recurses. Backtracks on dead ends.
 function generateTiling(cols, rows, numPieces, rng) {
   const grid = Array(rows).fill(null).map(() => Array(cols).fill(-1));
   const pieces = new Array(numPieces).fill(null);
   let iterations = 0;
-  const MAX_ITER = 100000;
+  const MAX_ITER = 60000;
 
   function findFirstEmpty() {
     for (let y = 0; y < rows; y++)
@@ -124,27 +125,46 @@ function generateTiling(cols, rows, numPieces, rng) {
     pieces.fill(null);
     for (let i = 0; i < 50; i++) rng(); // advance rng state
     if (!solve(0)) {
-      // Ultimate fallback: fill with O-pieces
+      // Ultimate fallback: fill with 2x2 O-pieces or 1x4 I-pieces
       let pid = 0;
-      for (let y = 0; y < rows; y += 2) {
-        for (let x = 0; x < cols; x += 2) {
-          if (pid >= numPieces) break;
-          pieces[pid] = [{ x, y }, { x: x+1, y }, { x, y: y+1 }, { x: x+1, y: y+1 }];
-          pid++;
+      if (cols % 2 === 0 && rows % 2 === 0) {
+        for (let y = 0; y < rows; y += 2) {
+          for (let x = 0; x < cols; x += 2) {
+            if (pid >= numPieces) break;
+            pieces[pid] = [{ x, y }, { x: x+1, y }, { x, y: y+1 }, { x: x+1, y: y+1 }];
+            pid++;
+          }
+        }
+      } else if (cols % 4 === 0) {
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < cols; x += 4) {
+            if (pid >= numPieces) break;
+            pieces[pid] = [{ x, y }, { x: x+1, y }, { x: x+2, y }, { x: x+3, y }];
+            pid++;
+          }
+        }
+      } else {
+        for (let y = 0; y < rows; y += 4) {
+          for (let x = 0; x < cols; x++) {
+            if (pid >= numPieces) break;
+            pieces[pid] = [{ x, y }, { x, y: y+1 }, { x, y: y+2 }, { x, y: y+3 }];
+            pid++;
+          }
         }
       }
     }
   }
 
-  return pieces;
+  return pieces.filter(Boolean);
 }
 
 function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 500);
-  const isCV = piece.label === 'cv';
+  const isVideo = piece.isVideo || piece.label === 'cv';
   const isFeatured = piece.featured;
-  const isStatic = isCV || isFeatured;
+  const isStatic = isVideo || isFeatured;
+  const clipId = `clip-${piece.id || piece.label}-${fallIndex}`;
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 500);
@@ -156,13 +176,13 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
   const handleMouseLeave = () => setIsHovered(false);
 
   // Color logic:
-  // CV/Portfolio (static): always their color (CV is video, Portfolio is blue)
-  // Regular: dim gray while falling and connected → vibrant color on hover
+  // Video / Featured: always their assigned color
+  // Regular: dim gray while resting → vibrant hoverColor on hover
   let bgColor;
   if (isStatic) {
-    bgColor = piece.color;
+    bgColor = piece.color || (isFeatured ? '#4A7BC7' : '#616161');
   } else if (isHovered) {
-    bgColor = piece.hoverColor;
+    bgColor = piece.hoverColor || '#2196F3';
   } else {
     bgColor = isDark ? '#333' : '#e0e0e0';
   }
@@ -180,7 +200,7 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
 
   // Place label in the bottom-left cell of the piece
   const sortedCells = [...piece.cells].sort((a, b) => b.y - a.y || a.x - b.x);
-  const labelCell = sortedCells[0];
+  const labelCell = sortedCells[0] || piece.cells[0];
   const lx = labelCell.x - minX;
   const ly = labelCell.y - minY;
 
@@ -205,7 +225,7 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
   );
 
   // Deterministic random delay based on label letters for staggered pulsing
-  const labelHash = piece.label.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const labelHash = (piece.label || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const blinkDelay = (labelHash % 50) / 10;
 
   const pieceStyle = {
@@ -215,15 +235,15 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
     gridRowEnd: maxY + 2,
     position: 'relative',
     cursor: piece.link ? 'pointer' : 'default',
-    backgroundColor: isCV ? 'transparent' : bgColor,
+    backgroundColor: isVideo ? 'transparent' : bgColor,
     transition: 'background-color 0.5s ease',
-    clipPath: `url(#clip-${piece.label})`,
-    WebkitClipPath: `url(#clip-${piece.label})`,
+    clipPath: `url(#${clipId})`,
+    WebkitClipPath: `url(#${clipId})`,
     display: 'block',
     overflow: 'hidden',
-    '--cell-w': `calc((100% - (${W} - 1) * var(--grid-gap)) / ${W})`,
-    '--cell-h': `calc((100% - (${H} - 1) * var(--grid-gap)) / ${H})`,
-    '--vibrant-color': piece.hoverColor,
+    '--cell-w': `calc((100% - (${W} - 1) * var(--grid-gap, 2px)) / ${W})`,
+    '--cell-h': `calc((100% - (${H} - 1) * var(--grid-gap, 2px)) / ${H})`,
+    '--vibrant-color': piece.hoverColor || '#2196F3',
     '--dim-color': isDark ? '#333' : '#e0e0e0',
   };
 
@@ -241,91 +261,88 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
   } : {};
 
   return (
-    <>
-      <Element
-        style={pieceStyle}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        {...linkProps}
-      >
-        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-          <defs>
-            <clipPath id={`clip-${piece.label}`} clipPathUnits="userSpaceOnUse">
-              {piece.cells.map((cell, idx) => {
-                const clx = cell.x - minX;
-                const cly = cell.y - minY;
+    <Element
+      style={pieceStyle}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      {...linkProps}
+    >
+      <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+        <defs>
+          <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
+            {piece.cells.map((cell, idx) => {
+              const clx = cell.x - minX;
+              const cly = cell.y - minY;
 
-                // Check adjacency within the piece
-                const hasLeft = piece.cells.some(c => c.x === cell.x - 1 && c.y === cell.y);
-                const hasRight = piece.cells.some(c => c.x === cell.x + 1 && c.y === cell.y);
-                const hasTop = piece.cells.some(c => c.x === cell.x && c.y === cell.y - 1);
-                const hasBottom = piece.cells.some(c => c.x === cell.x && c.y === cell.y + 1);
+              // Check adjacency within the piece
+              const hasLeft = piece.cells.some(c => c.x === cell.x - 1 && c.y === cell.y);
+              const hasRight = piece.cells.some(c => c.x === cell.x + 1 && c.y === cell.y);
+              const hasTop = piece.cells.some(c => c.x === cell.x && c.y === cell.y - 1);
+              const hasBottom = piece.cells.some(c => c.x === cell.x && c.y === cell.y + 1);
 
-                const leftExtend = hasLeft ? 'var(--grid-gap) / 2' : '0px';
-                const rightExtend = hasRight ? 'var(--grid-gap) / 2' : '0px';
-                const topExtend = hasTop ? 'var(--grid-gap) / 2' : '0px';
-                const bottomExtend = hasBottom ? 'var(--grid-gap) / 2' : '0px';
+              const leftExtend = hasLeft ? 'var(--grid-gap, 2px) / 2' : '0px';
+              const rightExtend = hasRight ? 'var(--grid-gap, 2px) / 2' : '0px';
+              const topExtend = hasTop ? 'var(--grid-gap, 2px) / 2' : '0px';
+              const bottomExtend = hasBottom ? 'var(--grid-gap, 2px) / 2' : '0px';
 
-                // Sizing and positioning using CSS variables and calc
-                const rx = `calc(${clx} * (var(--cell-w) + var(--grid-gap)) - ${leftExtend})`;
-                const ry = `calc(${cly} * (var(--cell-h) + var(--grid-gap)) - ${topExtend})`;
-                const rw = `calc(var(--cell-w) + ${leftExtend} + ${rightExtend})`;
-                const rh = `calc(var(--cell-h) + ${topExtend} + ${bottomExtend})`;
+              const rx = `calc(${clx} * (var(--cell-w) + var(--grid-gap, 2px)) - ${leftExtend})`;
+              const ry = `calc(${cly} * (var(--cell-h) + var(--grid-gap, 2px)) - ${topExtend})`;
+              const rw = `calc(var(--cell-w) + ${leftExtend} + ${rightExtend})`;
+              const rh = `calc(var(--cell-h) + ${topExtend} + ${bottomExtend})`;
 
-                return (
-                  <rect
-                    key={idx}
-                    x={rx}
-                    y={ry}
-                    width={rw}
-                    height={rh}
-                    style={{
-                      x: rx,
-                      y: ry,
-                      width: rw,
-                      height: rh
-                    }}
-                  />
-                );
-              })}
-            </clipPath>
-          </defs>
-        </svg>
-        {isCV && (
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              position: 'absolute',
-              inset: 0,
-              border: 'none',
-              outline: 'none',
-            }}
-          >
-            <source src="/cv-video.mp4" type="video/mp4" />
-          </video>
-        )}
-        {showText && (
-          <div
-            style={{
-              position: 'absolute',
-              left: `calc(${lx} * (var(--cell-w) + var(--grid-gap)))`,
-              top: `calc(${ly} * (var(--cell-h) + var(--grid-gap)))`,
-              width: `var(--cell-w)`,
-              height: `var(--cell-h)`,
-              pointerEvents: 'none',
-            }}
-          >
-            {labelContent}
-          </div>
-        )}
-      </Element>
-    </>
+              return (
+                <rect
+                  key={idx}
+                  x={rx}
+                  y={ry}
+                  width={rw}
+                  height={rh}
+                  style={{
+                    x: rx,
+                    y: ry,
+                    width: rw,
+                    height: rh
+                  }}
+                />
+              );
+            })}
+          </clipPath>
+        </defs>
+      </svg>
+      {isVideo && (
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            position: 'absolute',
+            inset: 0,
+            border: 'none',
+            outline: 'none',
+          }}
+        >
+          <source src="/cv-video.mp4" type="video/mp4" />
+        </video>
+      )}
+      {showText && (
+        <div
+          style={{
+            position: 'absolute',
+            left: `calc(${lx} * (var(--cell-w) + var(--grid-gap, 2px)))`,
+            top: `calc(${ly} * (var(--cell-h) + var(--grid-gap, 2px)))`,
+            width: `var(--cell-w)`,
+            height: `var(--cell-h)`,
+            pointerEvents: 'none',
+          }}
+        >
+          {labelContent}
+        </div>
+      )}
+    </Element>
   );
 }
 
@@ -337,58 +354,94 @@ function App() {
   const [seed, setSeed] = useState(() => Math.random());
   const [allLanded, setAllLanded] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 600);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
 
+  // Load links from localStorage or initial JSON
+  const [links, setLinks] = useState(() => {
+    try {
+      const cached = localStorage.getItem('kv_links_data');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Error loading links from localStorage:', e);
+    }
+    return defaultLinksData;
+  });
+
+  // Fetch from backend API on mount
+  useEffect(() => {
+    fetch('/api/links')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && Array.isArray(data) && data.length > 0) {
+          setLinks(data);
+          localStorage.setItem('kv_links_data', JSON.stringify(data));
+        }
+      })
+      .catch(() => {
+        // Backend not running / offline - use local state
+      });
+  }, []);
+
+  // Keyboard shortcut: Ctrl+Shift+A (or Cmd+Shift+A) to open Admin
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setIsAdminOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Window resize handler
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 600);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const cols = isMobile ? 6 : 8;
-  const rows = isMobile ? 8 : 6;
+  // Calculate dynamic grid dimensions (cols, rows)
+  const { cols, rows } = useMemo(() => {
+    return calculateOptimalGrid(links.length, isMobile);
+  }, [links.length, isMobile]);
 
-  const generateLayout = () => {
-    const items = [
-      { label: 'rm8pfix', link: 'https://rm8pfix.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#00BCD4' },
-      { label: 'netflix', link: 'https://nf.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#FF9800' },
-      { label: 'portfolio', link: 'https://portfolio.khoavo.myds.me', featured: true, color: '#4A7BC7', hoverColor: '#2196F3' },
-      { label: 'cv', link: 'https://cv.khoavo.myds.me', color: '#616161', hoverColor: '#424242' },
-      { label: 'youtube', link: 'https://ut.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#FF5722' },
-      { label: 'tiktok', link: 'https://tt.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#9C27B0' },
-      { label: 'spotify', link: 'https://sp.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#4CAF50' },
-      { label: 'tools', link: 'https://it.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#FFC107' },
-      { label: 'save', link: 'https://save.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#E91E63' },
-      { label: 'free', link: 'https://free.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#00BCD4' },
-      { label: 'jpg', link: 'https://jpg.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#673AB7' },
-      { label: 'pdf', link: 'https://pdf.khoavo.myds.me', color: '#E8E8E8', hoverColor: '#795548' },
-    ];
-
+  // Generate layout with tetromino tiling
+  const layout = useMemo(() => {
+    if (!links || links.length === 0) return [];
     const rng = createRandom(seed);
-    const tiling = generateTiling(cols, rows, items.length, rng);
+    const tiling = generateTiling(cols, rows, links.length, rng);
 
-    // Randomly assign items to tiling positions
-    const shuffledItems = [...items];
+    // Randomly assign links to tiling positions
+    const shuffledItems = [...links];
     for (let i = shuffledItems.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1));
       [shuffledItems[i], shuffledItems[j]] = [shuffledItems[j], shuffledItems[i]];
     }
 
-    return tiling.map((cells, i) => ({ ...shuffledItems[i], cells }));
-  };
-
-  const layout = generateLayout();
+    return tiling.map((cells, i) => ({
+      ...(shuffledItems[i] || links[i % links.length]),
+      cells
+    }));
+  }, [links, cols, rows, seed]);
 
   // Falling order: bottom pieces first (stacking up like Tetris)
-  const fallingOrder = [...layout].sort((a, b) => {
-    const maxYA = Math.max(...a.cells.map(c => c.y));
-    const maxYB = Math.max(...b.cells.map(c => c.y));
-    if (maxYB !== maxYA) return maxYB - maxYA;
-    return Math.min(...a.cells.map(c => c.x)) - Math.min(...b.cells.map(c => c.x));
-  });
-  const fallIndexMap = {};
-  fallingOrder.forEach((piece, idx) => {
-    fallIndexMap[piece.label] = idx;
-  });
+  const { fallingOrder, fallIndexMap } = useMemo(() => {
+    const sorted = [...layout].sort((a, b) => {
+      const maxYA = Math.max(...a.cells.map(c => c.y));
+      const maxYB = Math.max(...b.cells.map(c => c.y));
+      if (maxYB !== maxYA) return maxYB - maxYA;
+      return Math.min(...a.cells.map(c => c.x)) - Math.min(...b.cells.map(c => c.x));
+    });
+    const map = {};
+    sorted.forEach((piece, idx) => {
+      map[piece.id || piece.label] = idx;
+    });
+    return { fallingOrder: sorted, fallIndexMap: map };
+  }, [layout]);
 
   const totalFallTime = (layout.length - 1) * FALL_STAGGER + FALL_DURATION;
 
@@ -396,12 +449,27 @@ function App() {
     setAllLanded(false);
     const timer = setTimeout(() => setAllLanded(true), totalFallTime * 1000 + 300);
     return () => clearTimeout(timer);
-  }, [seed]);
+  }, [seed, layout.length, totalFallTime]);
 
   const toggleTheme = () => setIsDark(!isDark);
-  const refreshLayout = () => {
+  const refreshLayout = useCallback(() => {
     setAllLanded(false);
     setSeed(Math.random());
+  }, []);
+
+  const handleSaveLinks = async (newLinks) => {
+    setLinks(newLinks);
+    localStorage.setItem('kv_links_data', JSON.stringify(newLinks));
+    try {
+      await fetch('/api/links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newLinks),
+      });
+    } catch (e) {
+      console.warn('Could not save to API endpoint, stored locally in localStorage.');
+    }
+    refreshLayout();
   };
 
   const bg = isDark ? '#1a1a1a' : '#ffffff';
@@ -425,13 +493,34 @@ function App() {
           <a href="/" style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>Khoa.vo</a>
           <span style={{ fontSize: '10px', color: isDark ? '#666' : '#999' }} className="header-tagline">where design meets intelligence</span>
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button
-            onClick={refreshLayout}
+            onClick={() => setIsAdminOpen(true)}
+            title="Admin Login / Link Management (Ctrl+Shift+A)"
             style={{
               background: 'none',
               border: `1px solid ${borderColor}`,
-              padding: '8px 12px',
+              padding: '6px 10px',
+              fontSize: '12px',
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              color: textColor,
+              touchAction: 'manipulation',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <span>⚙</span>
+            <span style={{ fontSize: '10px' }}>Admin</span>
+          </button>
+          <button
+            onClick={refreshLayout}
+            title="Shuffle Layout"
+            style={{
+              background: 'none',
+              border: `1px solid ${borderColor}`,
+              padding: '6px 12px',
               fontSize: '14px',
               fontFamily: 'inherit',
               cursor: 'pointer',
@@ -443,10 +532,11 @@ function App() {
           </button>
           <button
             onClick={toggleTheme}
+            title="Toggle Light / Dark Theme"
             style={{
               background: 'none',
               border: `1px solid ${borderColor}`,
-              padding: '8px 12px',
+              padding: '6px 12px',
               fontSize: '14px',
               fontFamily: 'inherit',
               cursor: 'pointer',
@@ -459,13 +549,23 @@ function App() {
         </div>
       </header>
 
-      <main className="tetris-board" key={seed} style={{ background: isDark ? '#222' : '#fff' }}>
+      <main 
+        className="tetris-board" 
+        key={seed} 
+        style={{ 
+          background: isDark ? '#222' : '#fff',
+          '--grid-cols': cols,
+          '--grid-rows': rows,
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gridTemplateRows: `repeat(${rows}, 1fr)`,
+        }}
+      >
         {layout.map((piece) => (
           <TetrisPiece
-            key={piece.label}
+            key={`${piece.id || piece.label}-${piece.cells.map(c=>`${c.x},${c.y}`).join('_')}`}
             piece={piece}
             isDark={isDark}
-            fallIndex={fallIndexMap[piece.label]}
+            fallIndex={fallIndexMap[piece.id || piece.label] ?? 0}
             allLanded={allLanded}
           />
         ))}
@@ -483,6 +583,16 @@ function App() {
       }}>
         <p>© {new Date().getFullYear()} — Khoa.vo</p>
       </footer>
+
+      {/* Admin Management Modal */}
+      <AdminModal
+        isOpen={isAdminOpen}
+        onClose={() => setIsAdminOpen(false)}
+        links={links}
+        onSaveLinks={handleSaveLinks}
+        isDark={isDark}
+        gridInfo={{ cols, rows }}
+      />
     </div>
   );
 }
