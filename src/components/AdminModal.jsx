@@ -65,12 +65,12 @@ export default function AdminModal({
     }
 
     // Fallback local check
-    const savedPw = localStorage.getItem('kv_admin_pw') || 'admin';
+    const savedPw = localStorage.getItem('kv_admin_pw') || 'thieugia';
     if (password === savedPw) {
       setIsAuthenticated(true);
       sessionStorage.setItem('kv_admin_auth', 'true');
     } else {
-      setAuthError('Incorrect password. Default is "admin"');
+      setAuthError('Incorrect password.');
     }
   };
 
@@ -162,7 +162,7 @@ export default function AdminModal({
       // fallback local
     }
 
-    const savedPw = localStorage.getItem('kv_admin_pw') || 'admin';
+    const savedPw = localStorage.getItem('kv_admin_pw') || 'thieugia';
     if (currentPw === savedPw) {
       localStorage.setItem('kv_admin_pw', newPw);
       setPwMessage({ text: '✓ Password updated successfully (local)!', isError: false });
@@ -317,9 +317,6 @@ export default function AdminModal({
               >
                 Log In
               </button>
-              <div style={{ fontSize: '10px', color: subText, marginTop: '8px' }}>
-                Default password: <code>admin</code>
-              </div>
             </form>
           </div>
         ) : (

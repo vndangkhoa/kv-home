@@ -30,7 +30,7 @@ function apiPlugin() {
     } catch (e) {
       console.error('Error reading auth.json:', e)
     }
-    return { password: 'admin' }
+    return { password: 'thieugia' }
   }
 
   const writeAuth = (data) => {
