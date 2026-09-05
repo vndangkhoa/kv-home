@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { calculateOptimalGrid } from './utils/gridCalculator';
+import { getVideoFromIndexedDB } from './utils/videoStorage';
 import AdminModal from './components/AdminModal';
 import defaultLinksData from './data/links.json';
 
@@ -147,7 +148,7 @@ function generateTiling(cols, rows, numPieces, rng) {
         for (let y = 0; y < rows; y += 4) {
           for (let x = 0; x < cols; x++) {
             if (pid >= numPieces) break;
-            pieces[pid] = [{ x, y }, { x, y: y+1 }, { x, y: y+2 }, { x, y: y+3 }];
+            pieces[pid] = [{ x, y }, { x: x, y: y+1 }, { x: x, y: y+2 }, { x: x, y: y+3 }];
             pid++;
           }
         }
@@ -161,17 +162,57 @@ function generateTiling(cols, rows, numPieces, rng) {
 function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 500);
+  const [resolvedVideoSrc, setResolvedVideoSrc] = useState(piece.videoUrl || (piece.label === 'cv' ? '/cv-video.mp4' : ''));
+
   const isVideo = !!(piece.isVideo || piece.label === 'cv');
   const isFeatured = !!piece.featured;
   const isStatic = isVideo || isFeatured;
   const clipId = `clip-${piece.id || piece.label}-${fallIndex}`;
-  const videoSrc = piece.videoUrl || piece.videoSrc || '/cv-video.mp4';
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 500);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Resolve video source (handles IndexedDB, uploads, and local assets)
+  useEffect(() => {
+    let active = true;
+    let objectUrlToRevoke = null;
+
+    async function loadSrc() {
+      const src = piece.videoUrl || (piece.label === 'cv' ? '/cv-video.mp4' : '');
+      if (!src) {
+        if (active) setResolvedVideoSrc('');
+        return;
+      }
+
+      if (src.startsWith('idb://')) {
+        try {
+          const blobUrl = await getVideoFromIndexedDB(src);
+          if (active && blobUrl) {
+            objectUrlToRevoke = blobUrl;
+            setResolvedVideoSrc(blobUrl);
+          }
+        } catch (e) {
+          console.warn('Could not load video from IndexedDB:', e);
+        }
+      } else {
+        if (active) setResolvedVideoSrc(src);
+      }
+    }
+
+    if (isVideo) {
+      loadSrc();
+    }
+
+    return () => {
+      active = false;
+      if (objectUrlToRevoke) {
+        URL.revokeObjectURL(objectUrlToRevoke);
+      }
+    };
+  }, [piece.videoUrl, piece.label, isVideo]);
 
   const handleMouseEnter = () => setIsHovered(true);
   const handleMouseLeave = () => setIsHovered(false);
@@ -281,7 +322,6 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
               const clx = cell.x - minX;
               const cly = cell.y - minY;
 
-              // Check adjacency within the piece
               const hasLeft = piece.cells.some(c => c.x === cell.x - 1 && c.y === cell.y);
               const hasRight = piece.cells.some(c => c.x === cell.x + 1 && c.y === cell.y);
               const hasTop = piece.cells.some(c => c.x === cell.x && c.y === cell.y - 1);
@@ -310,10 +350,10 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
           </clipPath>
         </defs>
       </svg>
-      {isVideo && (
+      {isVideo && resolvedVideoSrc && (
         <video
-          key={videoSrc}
-          src={videoSrc}
+          key={resolvedVideoSrc}
+          src={resolvedVideoSrc}
           autoPlay
           loop
           muted
@@ -380,7 +420,11 @@ function App() {
       .then(data => {
         if (data && Array.isArray(data) && data.length > 0) {
           setLinks(data);
-          localStorage.setItem('kv_links_data', JSON.stringify(data));
+          try {
+            localStorage.setItem('kv_links_data', JSON.stringify(data));
+          } catch (e) {
+            // ignore localStorage quota warnings
+          }
         }
       })
       .catch(() => {
@@ -462,7 +506,12 @@ function App() {
 
   const handleSaveLinks = async (newLinks) => {
     setLinks(newLinks);
-    localStorage.setItem('kv_links_data', JSON.stringify(newLinks));
+    try {
+      localStorage.setItem('kv_links_data', JSON.stringify(newLinks));
+    } catch (e) {
+      console.warn('localStorage full or unavailable');
+    }
+
     try {
       await fetch('/api/links', {
         method: 'POST',
@@ -470,7 +519,7 @@ function App() {
         body: JSON.stringify(newLinks),
       });
     } catch (e) {
-      console.warn('Could not save to API endpoint, stored locally in localStorage.');
+      console.warn('API endpoint not reachable, changes active in session.');
     }
     refreshLayout();
   };

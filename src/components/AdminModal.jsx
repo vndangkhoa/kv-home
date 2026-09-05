@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { saveVideoToIndexedDB } from '../utils/videoStorage';
 
 const PRESET_COLORS = [
   '#00BCD4', '#FF9800', '#2196F3', '#FF5722', 
   '#9C27B0', '#4CAF50', '#FFC107', '#E91E63', 
   '#673AB7', '#795548', '#607D8B', '#3F51B5',
   '#009688', '#E65100', '#1E88E5', '#8E24AA',
-  '#E91E63', '#00E676', '#FFD600', '#FF1744'
+  '#00E676', '#FFD600', '#FF1744', '#00B0FF'
 ];
 
 export default function AdminModal({ 
@@ -24,6 +25,7 @@ export default function AdminModal({
   const [saveStatus, setSaveStatus] = useState('');
   const [jsonText, setJsonText] = useState('');
   const [uploadingIdx, setUploadingIdx] = useState(null);
+  const [uploadSuccessMsg, setUploadSuccessMsg] = useState({});
   
   // Password change state
   const [currentPw, setCurrentPw] = useState('');
@@ -89,14 +91,10 @@ export default function AdminModal({
       updated[index].title = value.toUpperCase();
     }
     
-    // When changing hoverColor, sync color too so featured & hover colors both match
-    if (field === 'hoverColor') {
+    // Synchronize color & hoverColor
+    if (field === 'hoverColor' || field === 'color') {
       updated[index].color = value;
-    }
-    
-    // When toggling featured on, ensure color is set
-    if (field === 'featured' && value && !updated[index].color) {
-      updated[index].color = updated[index].hoverColor || '#2196F3';
+      updated[index].hoverColor = value;
     }
 
     setItems(updated);
@@ -106,44 +104,76 @@ export default function AdminModal({
     const updated = [...items];
     updated[index] = {
       ...updated[index],
+      color: colorHex,
       hoverColor: colorHex,
-      color: colorHex
     };
+    setItems(updated);
+  };
+
+  const handleDisplayModeChange = (index, mode) => {
+    const updated = [...items];
+    if (mode === 'solid') {
+      updated[index].featured = true;
+      updated[index].isVideo = false;
+    } else if (mode === 'hover') {
+      updated[index].featured = false;
+      updated[index].isVideo = false;
+    } else if (mode === 'video') {
+      updated[index].isVideo = true;
+      updated[index].featured = false;
+      if (!updated[index].videoUrl) {
+        updated[index].videoUrl = '/cv-video.mp4';
+      }
+    }
     setItems(updated);
   };
 
   const handleVideoUpload = async (index, file) => {
     if (!file) return;
     setUploadingIdx(index);
+    setUploadSuccessMsg(prev => ({ ...prev, [index]: '' }));
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const base64Data = e.target.result;
-      try {
-        const res = await fetch('/api/upload-video', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: file.name, base64Data }),
-        });
+    const itemId = items[index]?.id || `item_${index}`;
 
-        if (res.ok) {
-          const result = await res.json();
-          handleItemChange(index, 'videoUrl', result.url);
-          handleItemChange(index, 'isVideo', true);
-          setUploadingIdx(null);
-          return;
-        }
-      } catch (err) {
-        console.warn('Server upload failed, using local blob URL');
-      }
-
-      // Fallback: use object URL / base64 directly
-      handleItemChange(index, 'videoUrl', base64Data);
+    // 1. Always save to IndexedDB first for instant, guaranteed browser playback
+    try {
+      const idbKey = `video_${itemId}_${Date.now()}`;
+      await saveVideoToIndexedDB(idbKey, file);
+      handleItemChange(index, 'videoUrl', `idb://${idbKey}`);
       handleItemChange(index, 'isVideo', true);
-      setUploadingIdx(null);
-    };
+      setUploadSuccessMsg(prev => ({ ...prev, [index]: `✓ Loaded video: ${file.name}` }));
+    } catch (e) {
+      console.warn('IndexedDB save warning:', e);
+    }
 
-    reader.readAsDataURL(file);
+    // 2. Also try uploading to server if backend is active
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target.result;
+        try {
+          const res = await fetch('/api/upload-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: file.name, base64Data }),
+          });
+
+          if (res.ok) {
+            const result = await res.json();
+            if (result.url) {
+              handleItemChange(index, 'videoUrl', result.url);
+              setUploadSuccessMsg(prev => ({ ...prev, [index]: `✓ Saved to server: ${result.url}` }));
+            }
+          }
+        } catch (serverErr) {
+          // Server offline, using IndexedDB
+        }
+        setUploadingIdx(null);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setUploadingIdx(null);
+    }
   };
 
   const handleMove = (index, direction) => {
@@ -167,7 +197,7 @@ export default function AdminModal({
       group: 'tools',
       color: defaultColor,
       hoverColor: defaultColor,
-      featured: false,
+      featured: true, // Default to Solid Color so user immediately sees color!
       isVideo: false,
       videoUrl: ''
     };
@@ -283,7 +313,7 @@ export default function AdminModal({
         border: `1px solid ${border}`,
         borderRadius: '8px',
         width: '100%',
-        maxWidth: '850px',
+        maxWidth: '880px',
         maxHeight: '90vh',
         display: 'flex',
         flexDirection: 'column',
@@ -463,7 +493,7 @@ export default function AdminModal({
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: '12px', color: subText }}>
-                      Add, edit, reorder, or delete web apps. The Tetris grid auto-calculates placement.
+                      Add, edit, reorder, or delete web apps. The Tetris grid auto-calculates layout dimensions.
                     </div>
                     <button
                       onClick={handleAddItem}
@@ -489,8 +519,10 @@ export default function AdminModal({
                   {/* Links List */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     {items.map((item, idx) => {
-                      const currentColor = item.hoverColor || item.color || '#2196F3';
+                      const currentColor = item.color || item.hoverColor || '#2196F3';
                       const isItemVideo = !!(item.isVideo || item.label === 'cv');
+                      const isItemSolid = !!item.featured && !isItemVideo;
+                      const currentMode = isItemVideo ? 'video' : (isItemSolid ? 'solid' : 'hover');
 
                       return (
                         <div
@@ -506,7 +538,7 @@ export default function AdminModal({
                             position: 'relative',
                           }}
                         >
-                          {/* Row 1: Order, Label, Title, Actions */}
+                          {/* Row 1: Order, Label, Title, Subtitle, Actions */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                             <div style={{ display: 'flex', gap: '2px' }}>
                               <button
@@ -552,11 +584,11 @@ export default function AdminModal({
                             {/* Color Preview Pill */}
                             <div 
                               style={{
-                                width: '16px',
-                                height: '16px',
-                                borderRadius: '50%',
+                                width: '18px',
+                                height: '18px',
+                                borderRadius: '4px',
                                 backgroundColor: isItemVideo ? '#9C27B0' : currentColor,
-                                border: '2px solid rgba(255,255,255,0.3)',
+                                border: '1px solid rgba(255,255,255,0.4)',
                                 flexShrink: 0
                               }}
                               title={isItemVideo ? 'Video Animation' : `Color: ${currentColor}`}
@@ -669,35 +701,88 @@ export default function AdminModal({
                             />
                           </div>
 
-                          {/* Row 3: Color Palette & Special Modes */}
+                          {/* Row 3: Display Mode Selector & Color Palette */}
                           <div style={{
                             display: 'flex',
-                            flexWrap: 'wrap',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            gap: '12px',
+                            flexDirection: 'column',
+                            gap: '10px',
                             background: isDark ? '#1f1f1f' : '#eeeeee',
                             padding: '10px 12px',
                             borderRadius: '5px'
                           }}>
-                            {/* Color Selector */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              <label style={{ fontSize: '9px', fontWeight: '600', color: subText }}>
-                                BLOCK COLOR PALETTE
-                              </label>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                {PRESET_COLORS.slice(0, 10).map((c) => (
+                            {/* Mode Selector Buttons */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                              <span style={{ fontSize: '9px', fontWeight: 'bold', color: subText }}>
+                                DISPLAY STYLE
+                              </span>
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDisplayModeChange(idx, 'solid')}
+                                  style={{
+                                    padding: '4px 10px',
+                                    borderRadius: '4px',
+                                    border: `1px solid ${currentMode === 'solid' ? currentColor : 'transparent'}`,
+                                    background: currentMode === 'solid' ? (isDark ? '#333' : '#fff') : 'transparent',
+                                    color: text,
+                                    fontSize: '10px',
+                                    cursor: 'pointer',
+                                    fontWeight: currentMode === 'solid' ? 'bold' : 'normal',
+                                  }}
+                                >
+                                  🟦 Always Colored (Solid)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDisplayModeChange(idx, 'hover')}
+                                  style={{
+                                    padding: '4px 10px',
+                                    borderRadius: '4px',
+                                    border: `1px solid ${currentMode === 'hover' ? (isDark ? '#fff' : '#000') : 'transparent'}`,
+                                    background: currentMode === 'hover' ? (isDark ? '#333' : '#fff') : 'transparent',
+                                    color: text,
+                                    fontSize: '10px',
+                                    cursor: 'pointer',
+                                    fontWeight: currentMode === 'hover' ? 'bold' : 'normal',
+                                  }}
+                                >
+                                  ⬜ Color on Hover Only
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDisplayModeChange(idx, 'video')}
+                                  style={{
+                                    padding: '4px 10px',
+                                    borderRadius: '4px',
+                                    border: `1px solid ${currentMode === 'video' ? '#9C27B0' : 'transparent'}`,
+                                    background: currentMode === 'video' ? (isDark ? '#333' : '#fff') : 'transparent',
+                                    color: text,
+                                    fontSize: '10px',
+                                    cursor: 'pointer',
+                                    fontWeight: currentMode === 'video' ? 'bold' : 'normal',
+                                  }}
+                                >
+                                  📹 Video Animation
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Color Swatches (When not video) */}
+                            {!isItemVideo && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '9px', color: subText }}>COLOR:</span>
+                                {PRESET_COLORS.map((c) => (
                                   <button
                                     key={c}
                                     type="button"
                                     onClick={() => handleColorSelect(idx, c)}
                                     style={{
-                                      width: '20px',
-                                      height: '20px',
-                                      borderRadius: '50%',
+                                      width: '22px',
+                                      height: '22px',
+                                      borderRadius: '4px',
                                       backgroundColor: c,
                                       border: currentColor.toLowerCase() === c.toLowerCase() ? '2px solid #fff' : '1px solid rgba(0,0,0,0.2)',
-                                      boxShadow: currentColor.toLowerCase() === c.toLowerCase() ? '0 0 4px #fff' : 'none',
+                                      boxShadow: currentColor.toLowerCase() === c.toLowerCase() ? '0 0 6px rgba(255,255,255,0.8)' : 'none',
                                       cursor: 'pointer',
                                       padding: 0,
                                     }}
@@ -725,40 +810,15 @@ export default function AdminModal({
                                   </span>
                                 </div>
                               </div>
-                            </div>
-
-                            {/* Toggles */}
-                            <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', cursor: 'pointer' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={!!item.featured}
-                                  onChange={(e) => handleItemChange(idx, 'featured', e.target.checked)}
-                                />
-                                <span title="Solid color continuously instead of dim resting state">
-                                  Solid Color (Featured)
-                                </span>
-                              </label>
-
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', cursor: 'pointer' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={isItemVideo}
-                                  onChange={(e) => handleItemChange(idx, 'isVideo', e.target.checked)}
-                                />
-                                <span title="Render background video animation inside block">
-                                  📹 Video Block
-                                </span>
-                              </label>
-                            </div>
+                            )}
                           </div>
 
-                          {/* Row 4: Video Upload / URL (When Video is Enabled) */}
+                          {/* Row 4: Video Upload & Management */}
                           {isItemVideo && (
                             <div style={{
                               background: isDark ? '#171717' : '#e8f0fe',
                               border: `1px solid ${isDark ? '#333' : '#c2d7ff'}`,
-                              padding: '10px 12px',
+                              padding: '12px',
                               borderRadius: '5px',
                               display: 'flex',
                               flexDirection: 'column',
@@ -766,11 +826,16 @@ export default function AdminModal({
                             }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ fontSize: '10px', fontWeight: 'bold', color: isDark ? '#64b5f6' : '#1976d2' }}>
-                                  📹 VIDEO ANIMATION SETTINGS
+                                  📹 VIDEO ANIMATION CONTROLS
                                 </span>
                                 {uploadingIdx === idx && (
-                                  <span style={{ fontSize: '10px', color: '#FF9800' }}>
-                                    Uploading video...
+                                  <span style={{ fontSize: '10px', color: '#FF9800', fontWeight: 'bold' }}>
+                                    Processing video...
+                                  </span>
+                                )}
+                                {uploadSuccessMsg[idx] && (
+                                  <span style={{ fontSize: '10px', color: '#4CAF50', fontWeight: 'bold' }}>
+                                    {uploadSuccessMsg[idx]}
                                   </span>
                                 )}
                               </div>
@@ -783,8 +848,8 @@ export default function AdminModal({
                                   onChange={(e) => handleItemChange(idx, 'videoUrl', e.target.value)}
                                   style={{
                                     flex: 1,
-                                    minWidth: '200px',
-                                    padding: '6px 8px',
+                                    minWidth: '220px',
+                                    padding: '7px 9px',
                                     borderRadius: '4px',
                                     border: `1px solid ${inputBorder}`,
                                     background: inputBg,
@@ -811,13 +876,13 @@ export default function AdminModal({
                                   onClick={() => fileInputRefs.current[idx]?.click()}
                                   disabled={uploadingIdx === idx}
                                   style={{
-                                    padding: '6px 12px',
+                                    padding: '7px 14px',
                                     background: '#2196F3',
                                     color: '#ffffff',
                                     border: 'none',
                                     borderRadius: '4px',
                                     fontSize: '11px',
-                                    fontWeight: '500',
+                                    fontWeight: '600',
                                     cursor: 'pointer',
                                     fontFamily: 'inherit',
                                     display: 'flex',
@@ -825,7 +890,7 @@ export default function AdminModal({
                                     gap: '4px',
                                   }}
                                 >
-                                  📁 Upload MP4 / WebM
+                                  📁 Upload Video File
                                 </button>
                               </div>
                             </div>

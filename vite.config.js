@@ -67,10 +67,11 @@ function apiPlugin() {
     }
 
     if (url === '/api/upload-video' && req.method === 'POST') {
-      let body = ''
-      req.on('data', (chunk) => { body += chunk })
+      const chunks = []
+      req.on('data', (chunk) => chunks.push(chunk))
       req.on('end', () => {
         try {
+          const body = Buffer.concat(chunks).toString('utf-8')
           const { filename, base64Data } = JSON.parse(body)
           if (!fs.existsSync(uploadsDir)) {
             fs.mkdirSync(uploadsDir, { recursive: true })
