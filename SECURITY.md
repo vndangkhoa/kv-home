@@ -1,25 +1,70 @@
-# Security & Anti-DDoS Guide
+# Security Architecture & Hardening Guide
 
-To fully protect your Synology NAS from DDoS attacks and hide your home IP address, you must use a reverse proxy service like **Cloudflare**. Frontend code alone cannot hide your server's IP.
+This document outlines the multi-layered security protections built into **Khoa.vo Portal** for safe public hosting at `https://khoavo.myds.me/`.
 
-## Step 1: Create a Cloudflare Account
-1.  Go to [Cloudflare.com](https://www.cloudflare.com/) and sign up.
-2.  Click **Add a Site** and enter your domain (e.g., `khoavo.i234.me`).
+---
 
-## Step 2: Update DNS Records
-1.  Cloudflare will scan your existing DNS records.
-2.  Ensure your `A` records (pointing to your home IP) are set to **Proxied** (Orange Cloud icon).
-    *   **Orange Cloud**: Traffic goes through Cloudflare -> Your NAS. (IP Hidden, DDoS Protected)
-    *   **Grey Cloud**: Traffic goes directly to your NAS. (IP Exposed, No Protection)
+## 1. Application-Level Security
 
-## Step 3: Configure SSL/TLS
-1.  Go to the **SSL/TLS** tab in Cloudflare.
-2.  Set the mode to **Full (Strict)** if your NAS has a valid certificate, or **Flexible** if it doesn't.
+### 🔐 Two-Factor Authentication (TOTP / 2FA)
+- **Standard**: Fully compliant with **RFC 6238** (Time-based One-Time Passwords).
+- **Compatibility**: Works with Google Authenticator, 1Password, Apple Keychain, Bitwarden, and Authy.
+- **Activation**:
+  1. Log in to the Admin modal (`Ctrl+Shift+A` or click the **Admin** button in header).
+  2. Navigate to the **Security & 2FA** tab.
+  3. Click **Setup Two-Factor Authentication**.
+  4. Scan the rendered QR code with your authenticator app (or copy the manual secret key).
+  5. Enter the 6-digit code displayed in your app to activate.
+- **Enforcement**: Once enabled, logging into the admin portal requires both your password and a valid 6-digit one-time code.
 
-## Step 4: Firewall Rules (Optional but Recommended)
-1.  Go to **Security > WAF**.
-2.  Create a rule to **Block** traffic from countries you don't expect visitors from.
-3.  Enable **Bot Fight Mode** to block automated attacks.
+### 🛡️ Password Cryptography
+- Passwords are encrypted using Node's native `crypto.scryptSync` with unique 16-byte cryptographic salts.
+- Constant-time comparison (`crypto.timingSafeEqual`) prevents side-channel timing attacks.
+- Legacy plaintext passwords in `data/auth.json` are automatically upgraded on server boot.
 
-## Why this is necessary?
-When you host a website on your NAS, your domain `khoavo.i234.me` translates directly to your home IP address. Anyone on the internet can see this IP. By using Cloudflare as a "middleman", visitors only see Cloudflare's IP, keeping your home network safe.
+### 🔑 Session Tokens (HMAC-SHA256)
+- Authenticated sessions receive a signed token (`<nonce>:<expiresAt>:<signature>`) valid for 24 hours.
+- Server session secret is automatically generated and persisted in `data/.session_secret`.
+- All mutating endpoints (`POST /api/links`, `POST /api/upload-video`, `POST /api/auth/password`, and 2FA APIs) strictly require an `Authorization: Bearer <token>` header. Unauthenticated calls receive `401 Unauthorized`.
+
+### ⏱️ Brute-Force Rate Limiting
+- The authentication endpoint (`/api/auth/verify`) tracks failed attempts per IP address in memory.
+- If an IP fails 5 consecutive attempts, it is locked out for 15 minutes (`429 Too Many Requests`).
+- Successful authentication immediately clears the failure counter.
+
+### 📹 Video Upload Hardening
+- Video uploads are restricted to `.mp4` and `.webm`.
+- **Magic-Byte Inspection**: Uploaded buffers are inspected for binary video signatures (MP4 `ftyp` box and WebM EBML header `1A 45 DF A3`). Any file disguised as video (such as HTML or SVG scripts trying to execute Stored XSS) is rejected with `400 Bad Request`.
+
+### 🌐 HTTP Security Headers
+Every HTTP response automatically serves strict security headers:
+- `Content-Security-Policy`: Restricts resource execution to trusted origins (`'self'`).
+- `X-Frame-Options: DENY`: Protects against Clickjacking in iframes.
+- `X-Content-Type-Options: nosniff`: Prevents MIME-type sniffing.
+- `Referrer-Policy: strict-origin-when-cross-origin`: Minimizes referrer information leakage.
+- `Strict-Transport-Security`: Enforces HTTPS.
+- Wildcard CORS (`Access-Control-Allow-Origin: *`) has been removed.
+
+---
+
+## 2. Network & Synology NAS Security (`khoavo.myds.me`)
+
+When exposing your portal publicly via Synology DDNS (`*.myds.me`):
+
+### Option A: Cloudflare Tunnel (Recommended)
+By running `cloudflared` in Docker on your NAS:
+1. **Zero Open Router Ports**: No port forwarding (80/443) needed on your home router.
+2. **Hidden Home IP**: Visitors only connect to Cloudflare edge nodes, completely hiding your residential IP.
+3. **Cloudflare Zero Trust**: You can add Cloudflare Access policies (e.g. require Google login or email pin) in front of sensitive subdomains.
+
+### Option B: Direct Synology DDNS (`khoavo.myds.me`)
+If using port forwarding on your home router:
+1. **Never Forward DSM Ports**: Do **not** forward port `5000` or `5001` (Synology DSM web interface) to the internet! Only forward port `443` to DSM Reverse Proxy -> Portal container (`port 3000`).
+2. **Enable Synology Auto-Block**:
+   - Go to **DSM > Control Panel > Security > Protection**.
+   - Enable **Auto-Block** (e.g. block IP after 5 login failures within 10 minutes).
+3. **Configure Firewall & GeoIP**:
+   - Go to **DSM > Control Panel > Security > Firewall**.
+   - Create a rule to only allow traffic from your country or trusted subnets.
+4. **SSL / Let's Encrypt**:
+   - In **DSM > Control Panel > Security > Certificate**, ensure a valid Let's Encrypt certificate is assigned to `khoavo.myds.me`.

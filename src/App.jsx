@@ -405,7 +405,7 @@ function App() {
       const cached = localStorage.getItem('kv_links_data');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 1) return parsed;
       }
     } catch (e) {
       console.error('Error loading links from localStorage:', e);
@@ -508,21 +508,28 @@ function App() {
     setLinks(newLinks);
     try {
       localStorage.setItem('kv_links_data', JSON.stringify(newLinks));
-    } catch (e) {
+    } catch {
       console.warn('localStorage full or unavailable');
     }
 
     let synced = false;
+    const token = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('kv_admin_token') : null;
     try {
       const res = await fetch('/api/links', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token || ''}`,
+        },
         body: JSON.stringify(newLinks),
       });
       if (res.ok) {
         synced = true;
+      } else if (res.status === 401) {
+        sessionStorage.removeItem('kv_admin_token');
+        alert('Session expired or unauthorized. Please log in again to sync changes to the server.');
       }
-    } catch (e) {
+    } catch {
       console.warn('API endpoint not reachable, changes active in local browser only.');
     }
     refreshLayout();

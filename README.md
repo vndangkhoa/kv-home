@@ -2,15 +2,19 @@
 
 # 🕹️ KV-Port (Khoa.vo Portal)
 
-<p><em>Where design meets intelligence. A dynamic, Tetris-inspired personal dashboard and service hub.</em></p>
+<p><em>Where design meets intelligence. A dynamic, Tetris-inspired personal dashboard, service hub, and app launcher.</em></p>
 
 [![React](https://img.shields.io/badge/React-19-blue.svg?logo=react)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-7-646CFF.svg?logo=vite)](https://vitejs.dev/)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-339933.svg?logo=node.js)](https://nodejs.org/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker)](https://www.docker.com/)
+[![2FA Protected](https://img.shields.io/badge/2FA-RFC_6238_TOTP-success.svg?logo=google-authenticator)](SECURITY.md)
+[![Security Hardened](https://img.shields.io/badge/Security-Hardened-blueviolet.svg)](SECURITY.md)
+[![Docker Hub](https://img.shields.io/badge/Docker_Hub-vndangkhoa%2Fkv--port-2496ED.svg?logo=docker)](https://hub.docker.com/r/vndangkhoa/kv-port)
+[![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvndangkhoa%2Fkv--port-181717.svg?logo=github)](https://github.com/vndangkhoa/kv-port/pkgs/container/kv-port)
+[![Forgejo](https://img.shields.io/badge/Forgejo-git.khoavo.myds.me-FF5722.svg?logo=git)](https://git.khoavo.myds.me/vndangkhoa/kv-port)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-[Features](#-key-features) • [Quick Start](#-quick-start) • [NAS Deployment](#-nas-deployment-synology--qnap) • [Docker](#-docker-deployment) • [Changelog](#-changelog)
+[Features](#-key-features) • [Security & 2FA](#-security--two-factor-authentication) • [Quick Start](#-quick-start) • [Docker Deployment](#-docker-deployment) • [NAS Deployment](#-nas-deployment-synology--qnap) • [Changelog](#-changelog)
 
 </div>
 
@@ -18,20 +22,60 @@
 
 ## 🌟 Overview
 
-**KV-Port** is a high-performance, responsive personal portal and app launcher featuring a procedural **Tetris-tiling layout engine**. Every card is rendered as an interlocking tetromino shape that dynamically animates into place on load, with full live administrative controls, video backgrounds, and multi-device persistence across your home lab, NAS, and cloud environments.
+**KV-Port** is an ultra-fast, responsive personal portal and home lab service launcher built with a procedural **Tetris-tiling layout engine**. Every application card is represented as a tetromino piece that dynamically falls and locks into place upon page load. 
+
+It includes real-time administrative controls, customizable colors, embedded background video resumes with byte-range streaming, enterprise-grade multi-factor security (**2FA / TOTP**), and zero external runtime dependencies on production hosts or Synology NAS setups.
 
 ---
 
 ## ✨ Key Features
 
-- 🧩 **Procedural Tetris Layout Engine**: Backtracking solver automatically computes perfect interlocking tetromino configurations based on viewport size and item count.
+- 🧩 **Procedural Tetris Layout Engine**: Backtracking solver automatically computes optimal interlocking tetromino configurations based on viewport aspect ratio and item count.
 - 📐 **Pixel-Perfect Seamless Blocks**: Individual blocks are rendered as continuous HTML elements clipped with SVG `clipPath` and extended via CSS `calc()`, eliminating internal borders while preserving precise inter-card gutters.
-- 🎬 **Video Resume & Media Blocks**: Supports embedded background videos (e.g. CV video) with HTTP 206 Partial Content range requests for smooth seeking and playback across Safari, Chrome, and iOS.
-- 🛠️ **Live Admin Dashboard**: Press `Ctrl+Shift+A` (or `Cmd+Shift+A` on macOS) or click the header menu to open the admin panel. Add, delete, reorder, change colors, upload videos, and edit links in real time.
-- 🔄 **True Multi-Device Persistence**: Changes made in the Admin page are saved to a central server and instantly reflected across all machines, smartphones, and tablets.
-- 📱 **Adaptive Viewport Scaling**: Transitions between an 8×6 landscape grid (4:3) on desktop and a 6×8 portrait layout (3:4) on mobile devices without vertical scrollbars.
-- 🌓 **Themes & Controls**: Dark/Light mode switcher and dynamic shuffle button to re-roll layout orientations.
-- 🚀 **Zero-Dependency Production Backend**: Standalone `server.js` uses native Node.js standard libraries—no external npm modules needed on your production host or NAS!
+- 🔐 **Built-In Two-Factor Authentication (2FA)**: RFC 6238 compliant TOTP engine built natively with `node:crypto`. Protect your admin session with Google Authenticator, Apple Keychain, 1Password, or Authy.
+- 🛡️ **Zero-Dependency Security Architecture**: Salted `scrypt` password hashing, timing-safe verification, HMAC-SHA256 session tokens, brute-force IP rate limiting, and magic-byte video upload validation.
+- 🎬 **Media & Video Resume Streaming**: Supports background videos with HTTP 206 Partial Content range requests for smooth seeking and playback across Safari, Chrome, iOS, and Android.
+- 🛠️ **Live Admin Management**: Press `Ctrl+Shift+A` (or `Cmd+Shift+A` on macOS) or click the **Admin** button to open the management panel. Add, delete, reorder, adjust colors, and edit links in real time.
+- 🔄 **True Multi-Device Persistence**: Edits made in the Admin panel synchronize with the central server and persist across all machines, smartphones, and tablets.
+- 📱 **Adaptive Viewport Scaling**: Fluidly transitions between landscape (desktop) and portrait (mobile) layouts without awkward horizontal or vertical scrollbars.
+- 🌓 **Themes & Layout Controls**: Instant Dark/Light mode switcher and dynamic shuffle button to re-roll tetromino layout configurations.
+- 🚀 **Zero-Dependency Production Backend**: Standalone `server.js` uses native Node.js standard libraries—no external npm modules needed on your Synology NAS or production server!
+
+---
+
+## 🔐 Security & Two-Factor Authentication
+
+Designed from the ground up for safe public exposure at `https://khoavo.myds.me/`:
+
+```mermaid
+graph TD
+    Client[Browser Client] -->|1. Enter Password| API[POST /api/auth/verify]
+    API -->|2. Verify Salted Scrypt Hash| CheckAuth{Password Valid?}
+    CheckAuth -- No --> Fail[401 Invalid Password + Rate Limiter]
+    CheckAuth -- Yes --> Check2FA{2FA Active?}
+    Check2FA -- Yes --> PromptOTP[Return 200: twoFactorRequired: true]
+    PromptOTP --> ClientOTP[Client Prompts for 6-Digit OTP]
+    ClientOTP -->|3. Submit Password + OTP| API
+    API -->|4. RFC 6238 TOTP Validation| OTPValid{Code Valid?}
+    OTPValid -- No --> FailOTP[401 Invalid 2FA Code]
+    OTPValid -- Yes --> IssueToken[Generate HMAC-SHA256 Bearer Token]
+    Check2FA -- No --> IssueToken
+    IssueToken --> SessionOK[200 OK: Store Token in sessionStorage]
+    SessionOK --> ProtectedAction[Authorized Mutations: POST /api/links, POST /api/upload-video]
+```
+
+### Security Highlights
+| Security Control | Implementation |
+| :--- | :--- |
+| **Two-Factor Authentication** | RFC 6238 TOTP with QR Code scanner & manual key entry. |
+| **Password Storage** | Cryptographic `scrypt` hashing with unique 16-byte random salts. |
+| **Timing Attack Defense** | `crypto.timingSafeEqual` prevents side-channel analysis. |
+| **API Protection** | Mutating endpoints require `Authorization: Bearer <token>`. |
+| **Brute-Force Defense** | Automatic 15-minute IP lockout after 5 consecutive failed attempts. |
+| **Upload Safety** | Strict extension checks (`.mp4`, `.webm`) + binary magic-byte inspection (`ftyp`, EBML). |
+| **HTTP Security Headers** | Strict `CSP`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `HSTS`. |
+
+> See [SECURITY.md](SECURITY.md) for full architecture details and Synology NAS reverse proxy recommendations.
 
 ---
 
@@ -39,24 +83,24 @@
 
 ```text
 kv-port/
-├── server.js              # Zero-dependency production HTTP & API server
+├── server.js              # Hardened zero-dependency production HTTP & API server
 ├── Dockerfile             # Multi-stage production container build
 ├── docker-compose.yml     # Container orchestration with persistent volumes
 ├── launch.sh              # Unified developer & deployment CLI script
 ├── dist/                  # Production build output (HTML, JS, CSS)
-├── data/                  # Persistent runtime JSON database (links, auth)
+├── data/                  # Persistent runtime JSON database (links.json, auth.json)
 ├── uploads/               # Persistent uploaded media & videos
 ├── src/
 │   ├── App.jsx            # Main application root & layout orchestration
 │   ├── components/
-│   │   ├── AdminModal.jsx # Full-featured administration modal
-│   │   ├── Header.jsx     # Navigation bar with controls
-│   │   └── ...            # Card and blueprint components
+│   │   ├── AdminModal.jsx # Administration modal with 2FA wizard & link editor
+│   │   └── ...            # Illustrations and card components
 │   ├── data/              # Default starter seed data (links.json, auth.json)
 │   └── utils/
 │       ├── gridCalculator.js  # Dynamic column/row optimization
 │       └── videoStorage.js    # IndexedDB caching utilities
-└── vite.config.js         # Vite bundling configuration & dev API plugin
+├── SECURITY.md            # Hardening guide & Synology exposure best practices
+└── vite.config.js         # Vite bundling configuration & dev API middleware
 ```
 
 ---
@@ -66,16 +110,16 @@ kv-port/
 ### 1. Using the Unified CLI (`launch.sh`)
 
 ```bash
-# Start local development server
+# Start local development server (http://localhost:5173)
 ./launch.sh dev
 
-# Access over local network
+# Expose dev server to local network (LAN)
 ./launch.sh dev --host
 
 # Build for production
 ./launch.sh build
 
-# Run production server locally
+# Start production server locally (http://localhost:3000)
 ./launch.sh start
 ```
 
@@ -95,14 +139,11 @@ npm run build
 npm start
 ```
 
-Default dev URL: `http://localhost:5173`  
-Default production URL: `http://localhost:3000`
-
 ---
 
 ## 🐳 Docker Deployment
 
-The image is pre-built, optimized, and published to multiple container registries:
+The image is automatically built, optimized, and pushed to 3 major container registries:
 
 - **Docker Hub**: `vndangkhoa/kv-port:latest`
 - **GitHub Container Registry (GHCR)**: `ghcr.io/vndangkhoa/kv-port:latest`
@@ -133,7 +174,7 @@ Start the container:
 docker compose up -d
 ```
 
-### Building the Image Locally
+### Building & Running Locally
 
 ```bash
 docker build -t kv-port .
@@ -146,10 +187,10 @@ docker run -d -p 3000:3000 -v $(pwd)/data:/app/data -v $(pwd)/uploads:/app/uploa
 
 ### Method 1: Synology Container Manager (Docker)
 
-1. Open **Container Manager** (or Docker) on DSM.
+1. Open **Container Manager** (or Docker) on Synology DSM.
 2. Go to **Project** > **Create**.
-3. Point to the folder containing `docker-compose.yml` (or upload it).
-4. Deploy the project! Your blocks and videos are automatically persisted in `./data` and `./uploads`.
+3. Point to the folder containing `docker-compose.yml` (or paste the YAML content).
+4. Deploy the project! Your links, 2FA secret, and videos persist automatically in `./data` and `./uploads`.
 
 ### Method 2: Native Node.js (Zero `npm install` on NAS!)
 
@@ -157,42 +198,63 @@ docker run -d -p 3000:3000 -v $(pwd)/data:/app/data -v $(pwd)/uploads:/app/uploa
    ```bash
    ./launch.sh build
    ```
-2. Copy these 4 files/folders to your NAS web folder (e.g. `/volume1/web/kv-port`):
+2. Copy these 4 folders/files to your NAS web folder (e.g. `/volume1/web/kv-port`):
    - `dist/`
    - `data/`
    - `uploads/`
    - `server.js`
-3. Start the server via Synology Task Scheduler (triggered on boot) or SSH:
+3. Run directly with Node.js:
    ```bash
    node server.js
-   # Or custom port:
+   # Or with custom port:
    PORT=3000 node server.js
    ```
 
 ---
 
-## 🔐 Admin Dashboard & APIs
+## 🔑 Initial Setup & Enabling 2FA
 
-Access the Admin Modal by pressing `Ctrl + Shift + A` (or `Cmd + Shift + A`) or clicking the **Admin** button in the header.
-
-- **Default Password**: `thieugia` (can be updated directly in the Admin modal).
-- **REST Endpoints**:
-  - `GET /api/links`: Fetch current block layout.
-  - `POST /api/links`: Save updated block layout.
-  - `POST /api/upload-video`: Upload MP4/WebM video with automatic filesystem storage.
-  - `POST /api/auth/verify`: Validate admin access.
-  - `POST /api/auth/password`: Securely change admin password.
+1. Launch your portal (`http://localhost:3000` or `https://khoavo.myds.me`).
+2. Press `Ctrl + Shift + A` (or `Cmd + Shift + A`) or click the **Admin** button in the header.
+3. Enter the initial password:
+   ```text
+   thieugia
+   ```
+4. Navigate to the **Security & 2FA** tab:
+   - **Update Password**: Set your own private password.
+   - **Setup 2FA**: Click **Setup Two-Factor Authentication**, scan the QR code using Google Authenticator, Apple Keychain, 1Password, or Authy, and enter the 6-digit confirmation code.
+5. All future logins will now require both your password and your 6-digit authenticator code.
 
 ---
 
 ## 📝 Changelog
+
+### [v1.2.0] - 2026-09-13 (Security & 2FA Release)
+
+#### Added
+- **Two-Factor Authentication (TOTP / 2FA)**: Native RFC 6238 TOTP engine built into `server.js` and `vite.config.js` with zero runtime npm dependencies.
+- **Interactive QR Code Setup**: Added QR code generator and Base32 secret manual key copy in the Admin Modal for one-click setup with Google Authenticator, Apple Keychain, 1Password, and Authy.
+- **Two-Step Login UI**: Clean 2-step verification flow with 6-digit formatted inputs and numeric paste support.
+- **Cryptographic Password Security**: Upgraded credential storage from plaintext to salted `scrypt` hashing with constant-time comparison (`crypto.timingSafeEqual`).
+- **HMAC-SHA256 Session Tokens**: Replaced unauthenticated write APIs with signed Bearer session tokens required on `/api/links`, `/api/upload-video`, `/api/auth/password`, and 2FA endpoints.
+- **Brute-Force Rate Limiter**: In-memory IP tracking locks out attackers for 15 minutes after 5 consecutive failed attempts (`429 Too Many Requests`).
+- **Binary Magic-Byte Upload Hardening**: Video uploads are verified using file signatures (`ftyp` for MP4, `1A 45 DF A3` for WebM) to prevent disguised scripts and Stored XSS.
+- **HTTP Security Headers**: Injected `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Strict-Transport-Security`.
+- **Multi-Registry Publishing**: Built and pushed official container images to Docker Hub (`vndangkhoa/kv-port`), GitHub Container Registry (`ghcr.io/vndangkhoa/kv-port`), and Forgejo (`git.khoavo.myds.me/vndangkhoa/kv-port`).
+
+#### Fixed
+- Fixed unauthenticated `POST /api/links` and `POST /api/upload-video` endpoints that previously allowed arbitrary public writes.
+- Fixed dev server authentication mismatch where `vite.config.js` failed to recognize hashed credentials.
+- Removed hardcoded fallback password check from client-side code.
+
+---
 
 ### [v1.1.0] - 2026-09-13
 
 #### Added
 - **Multi-Device Sync Architecture**: Integrated persistent production backend `server.js` using Node.js standard libraries (`node:http`, `node:fs`), resolving isolated browser `localStorage` drift.
 - **Docker Support**: Added multi-stage `Dockerfile` and `docker-compose.yml` with persistent volume mappings for `./data` and `./uploads`.
-- **Media Streaming**: Added HTTP 206 Partial Content range requests to allow native scrubbing and playback of video resume backgrounds on mobile and desktop.
+- **Media Streaming**: Added HTTP 206 Partial Content range requests for native scrubbing and playback of video resume backgrounds on mobile and desktop.
 - **Enhanced Admin Feedback**: Visual confirmation in Admin UI indicating whether edits synced to the central server (`✓ Saved & synced across all devices!`) or fell back to offline storage (`⚠ Saved locally only`).
 - **Unified CLI Tooling**: Added `start` and automatic directory preparation inside `launch.sh`.
 
