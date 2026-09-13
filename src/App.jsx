@@ -512,16 +512,21 @@ function App() {
       console.warn('localStorage full or unavailable');
     }
 
+    let synced = false;
     try {
-      await fetch('/api/links', {
+      const res = await fetch('/api/links', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newLinks),
       });
+      if (res.ok) {
+        synced = true;
+      }
     } catch (e) {
-      console.warn('API endpoint not reachable, changes active in session.');
+      console.warn('API endpoint not reachable, changes active in local browser only.');
     }
     refreshLayout();
+    return { synced };
   };
 
   const bg = isDark ? '#1a1a1a' : '#ffffff';

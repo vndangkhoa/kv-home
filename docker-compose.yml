@@ -1,0 +1,13 @@
+services:
+  khoavo-portal:
+    build: .
+    container_name: khoavo-portal
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0

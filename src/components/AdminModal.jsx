@@ -216,9 +216,13 @@ export default function AdminModal({
   const handleSave = async () => {
     setSaveStatus('Saving...');
     try {
-      await onSaveLinks(items);
-      setSaveStatus('✓ Saved successfully!');
-      setTimeout(() => setSaveStatus(''), 3000);
+      const result = await onSaveLinks(items);
+      if (result && result.synced) {
+        setSaveStatus('✓ Saved & synced across all devices!');
+      } else {
+        setSaveStatus('⚠ Saved locally only (server offline)');
+      }
+      setTimeout(() => setSaveStatus(''), 4000);
     } catch (err) {
       setSaveStatus('✗ Failed to save changes.');
     }
@@ -241,9 +245,13 @@ export default function AdminModal({
       });
       if (res.ok) {
         localStorage.setItem('kv_admin_pw', newPw);
-        setPwMessage({ text: '✓ Password updated successfully!', isError: false });
+        setPwMessage({ text: '✓ Password updated on server!', isError: false });
         setCurrentPw('');
         setNewPw('');
+        return;
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setPwMessage({ text: data.error || 'Current password incorrect', isError: true });
         return;
       }
     } catch (err) {
@@ -253,7 +261,7 @@ export default function AdminModal({
     const savedPw = localStorage.getItem('kv_admin_pw') || 'thieugia';
     if (currentPw === savedPw) {
       localStorage.setItem('kv_admin_pw', newPw);
-      setPwMessage({ text: '✓ Password updated successfully (local)!', isError: false });
+      setPwMessage({ text: '⚠ Password updated locally (server offline)', isError: false });
       setCurrentPw('');
       setNewPw('');
     } else {
