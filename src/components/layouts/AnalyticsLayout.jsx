@@ -561,24 +561,34 @@ export default function AnalyticsLayout({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [allOrderedLinks]);
 
+  // Stable targets signature: only re-probe if target links actually change
+  const targetsSignature = useMemo(() => {
+    return (links || []).map((l) => `${l.id || ''}:${l.link || ''}`).join('|');
+  }, [links]);
+
   // Fast parallel ping health probes for real homelab services
   useEffect(() => {
     let isMounted = true;
+    const controller = new AbortController();
+
     async function probeHealth() {
       const updates = {};
       await Promise.allSettled(
         links.map(async (item) => {
-          if (!item.link) return;
+          if (!item.link || !isMounted) return;
           const key = item.id || item.link;
           try {
-            const res = await fetch(`/api/ping?target=${encodeURIComponent(item.link)}`);
+            const res = await fetch(`/api/ping?target=${encodeURIComponent(item.link)}`, {
+              signal: controller.signal,
+            });
             if (res.ok) {
               const data = await res.json();
               updates[key] = data;
             } else {
               updates[key] = { ok: false, error: 'ERR' };
             }
-          } catch {
+          } catch (err) {
+            if (err.name === 'AbortError') return;
             updates[key] = { ok: false, error: 'TIMEOUT' };
           }
         })
@@ -592,9 +602,10 @@ export default function AnalyticsLayout({
     const timer = setInterval(probeHealth, 60000);
     return () => {
       isMounted = false;
+      controller.abort();
       clearInterval(timer);
     };
-  }, [links]);
+  }, [targetsSignature]);
 
   // Real homelab telemetry metrics
   const totalCount = links.length;

@@ -52,6 +52,9 @@ export default function SecurityTab({
     }
 
     const authToken = safeSessionStorage.getItem('kv_admin_token') || token;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+
     try {
       const res = await fetch('/api/auth/password', {
         method: 'POST',
@@ -60,7 +63,9 @@ export default function SecurityTab({
           'Authorization': `Bearer ${authToken || ''}`,
         },
         body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
+        signal: controller.signal,
       });
+      clearTimeout(timer);
 
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) {
@@ -78,10 +83,14 @@ export default function SecurityTab({
         setCurrentPw('');
         setNewPw('');
       } else {
-        setPwMessage({ text: data.error || 'Failed to update password', isError: true });
+        setPwMessage({ text: data.error || `Failed to update password (HTTP ${res.status})`, isError: true });
       }
-    } catch {
-      setPwMessage({ text: 'Failed to communicate with server.', isError: true });
+    } catch (err) {
+      clearTimeout(timer);
+      const msg = err.name === 'AbortError'
+        ? 'Request timed out. Server might be busy.'
+        : (err.message ? `Network error: ${err.message}` : 'Failed to communicate with server.');
+      setPwMessage({ text: msg, isError: true });
     }
   };
 

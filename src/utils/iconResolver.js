@@ -1,5 +1,8 @@
 // src/utils/iconResolver.js
 // Resolves official SVG icons for homelab services with automatic fallback via WalkxCode dashboard-icons CDN
+import { ALL_ICON_SLUGS } from '../data/homelabIcons';
+
+const VALID_SLUGS_SET = new Set(ALL_ICON_SLUGS);
 
 export const ICON_MAP = {
   // Container & Cluster Management
@@ -206,6 +209,14 @@ export const ICON_MAP = {
   heimdall: 'heimdall',
   flame: 'flame',
   glance: 'glance',
+
+  // Utilities & Document Tools
+  pdf: 'stirling-pdf',
+  stirling: 'stirling-pdf',
+  'stirling-pdf': 'stirling-pdf',
+  tools: 'it-tools',
+  'it-tools': 'it-tools',
+  it: 'it-tools',
 };
 
 export const CDN_BASE = 'https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg';
@@ -219,18 +230,21 @@ export function getIconSlug(item) {
   if (!item) return null;
   if (item.iconUrl && typeof item.iconUrl === 'string') return 'custom';
   if (item.logoUrl && typeof item.logoUrl === 'string') return 'custom';
-  if (item.iconSlug && typeof item.iconSlug === 'string') return item.iconSlug.trim().toLowerCase();
+  if (item.iconSlug && typeof item.iconSlug === 'string') {
+    const customSlug = item.iconSlug.trim().toLowerCase();
+    return VALID_SLUGS_SET.has(customSlug) ? customSlug : null;
+  }
 
   const labelKey = (item.label || '').toLowerCase().trim();
-  if (ICON_MAP[labelKey]) return ICON_MAP[labelKey];
+  if (ICON_MAP[labelKey] && VALID_SLUGS_SET.has(ICON_MAP[labelKey])) return ICON_MAP[labelKey];
 
   const titleKey = (item.title || '').toLowerCase().trim();
-  if (ICON_MAP[titleKey]) return ICON_MAP[titleKey];
+  if (ICON_MAP[titleKey] && VALID_SLUGS_SET.has(ICON_MAP[titleKey])) return ICON_MAP[titleKey];
 
-  // Fuzzy match in label or title
+  // Fuzzy match in label or title against known valid map entries
   for (const [key, slug] of Object.entries(ICON_MAP)) {
     if (labelKey.includes(key) || titleKey.includes(key)) {
-      return slug;
+      if (VALID_SLUGS_SET.has(slug)) return slug;
     }
   }
 
@@ -240,7 +254,7 @@ export function getIconSlug(item) {
       const hostname = new URL(item.link).hostname.toLowerCase();
       for (const [key, slug] of Object.entries(ICON_MAP)) {
         if (hostname.includes(key)) {
-          return slug;
+          if (VALID_SLUGS_SET.has(slug)) return slug;
         }
       }
     } catch {
@@ -248,8 +262,8 @@ export function getIconSlug(item) {
     }
   }
 
-  // Clean slug fallback if label looks like a single slug identifier (alphanumeric + dashes)
-  if (labelKey && /^[a-z0-9-]+$/.test(labelKey) && labelKey.length >= 3) {
+  // Clean slug fallback ONLY if label itself is an authentic WalkxCode slug
+  if (labelKey && VALID_SLUGS_SET.has(labelKey)) {
     return labelKey;
   }
 
@@ -270,7 +284,7 @@ export function getServiceIconUrl(item) {
 
   // 2. Resolve via slug mapping
   const slug = getIconSlug(item);
-  if (slug && slug !== 'custom') {
+  if (slug && slug !== 'custom' && VALID_SLUGS_SET.has(slug)) {
     return `${CDN_BASE}/${slug}.svg`;
   }
 

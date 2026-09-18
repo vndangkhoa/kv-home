@@ -708,23 +708,33 @@ export default function NouveauLayout({ links = [], isDark = true, settings = {}
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Stable targets signature: only re-probe if target links actually change
+  const targetsSignature = useMemo(() => {
+    return (links || []).map((l) => `${l.id || ''}:${l.link || ''}`).join('|');
+  }, [links]);
+
   // Periodic health check
   useEffect(() => {
     let isMounted = true;
+    const controller = new AbortController();
+
     async function probeHealth() {
       const updates = {};
       for (const item of links) {
-        if (!item.link) continue;
+        if (!item.link || !isMounted) continue;
         const key = item.id || item.link;
         try {
-          const res = await fetch(`/api/ping?target=${encodeURIComponent(item.link)}`);
+          const res = await fetch(`/api/ping?target=${encodeURIComponent(item.link)}`, {
+            signal: controller.signal,
+          });
           if (res.ok) {
             const data = await res.json();
             updates[key] = data;
           } else {
             updates[key] = { ok: false, error: 'ERR' };
           }
-        } catch {
+        } catch (err) {
+          if (err.name === 'AbortError') return;
           updates[key] = { ok: false, error: 'TIMEOUT' };
         }
       }
@@ -736,9 +746,10 @@ export default function NouveauLayout({ links = [], isDark = true, settings = {}
     const interval = setInterval(probeHealth, 30000);
     return () => {
       isMounted = false;
+      controller.abort();
       clearInterval(interval);
     };
-  }, [links]);
+  }, [targetsSignature]);
 
   // Unique groups
   const groups = useMemo(() => {

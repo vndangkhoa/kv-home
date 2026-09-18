@@ -704,7 +704,7 @@ function App() {
     setSeed(Math.random());
   }, []);
 
-  const handleSaveLinks = async (newLinks) => {
+  const handleSaveLinks = useCallback(async (newLinks) => {
     setLinks(newLinks);
     try {
       localStorage.setItem('kv_links_data', JSON.stringify(newLinks));
@@ -734,7 +734,15 @@ function App() {
     }
     refreshLayout();
     return { synced };
-  };
+  }, [refreshLayout]);
+
+  const handleLivePreviewLinks = useCallback((previewLinks) => {
+    setLinks(previewLinks);
+  }, []);
+
+  const handleLivePreviewSettings = useCallback((previewSettings) => {
+    setSettings((prev) => ({ ...prev, ...previewSettings }));
+  }, []);
 
   const handleSaveSettings = useCallback(async (newSettings) => {
     const updated = { ...settings, ...newSettings };
@@ -1158,10 +1166,10 @@ function App() {
         onClose={() => setIsAdminOpen(false)}
         links={links}
         onSaveLinks={handleSaveLinks}
-        onLivePreviewLinks={(previewLinks) => setLinks(previewLinks)}
+        onLivePreviewLinks={handleLivePreviewLinks}
         settings={settings}
         onSaveSettings={handleSaveSettings}
-        onLivePreviewSettings={(previewSettings) => setSettings(prev => ({ ...prev, ...previewSettings }))}
+        onLivePreviewSettings={handleLivePreviewSettings}
         currentTheme={currentTheme}
         onSelectTheme={handleSelectTheme}
         activeLayout={activeLayoutId}

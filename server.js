@@ -1013,8 +1013,18 @@ function serveFile(req, res, filePath) {
   }
 }
 
+// Ping cache to deduplicate rapid checks and prevent socket exhaustion
+const pingCache = new Map();
+const PING_CACHE_TTL = 15000; // 15 seconds cache
+
 // Ping helper with fallback from HEAD to GET, handling self-signed certs and LAN addresses
 function pingEndpoint(targetUrl) {
+  const now = Date.now();
+  const cached = pingCache.get(targetUrl);
+  if (cached && (now - cached.timestamp < PING_CACHE_TTL)) {
+    return Promise.resolve(cached.data);
+  }
+
   return new Promise((resolve) => {
     let urlObj;
     try {
@@ -1026,18 +1036,24 @@ function pingEndpoint(targetUrl) {
     const client = isHttps ? https : http;
     const start = Date.now();
 
+    const finish = (result) => {
+      pingCache.set(targetUrl, { data: result, timestamp: Date.now() });
+      resolve(result);
+    };
+
     const req = client.request(urlObj, {
       method: 'HEAD',
       timeout: 2500,
       rejectUnauthorized: false,
-      headers: { 'User-Agent': 'KV-Port-Ping/1.0' }
+      headers: { 'User-Agent': 'KV-Home-Ping/1.0' }
     }, (res) => {
-      resolve({ ok: true, latencyMs: Date.now() - start, status: res.statusCode });
+      res.resume(); // drain stream to immediately free connection
+      finish({ ok: true, latencyMs: Date.now() - start, status: res.statusCode });
     });
 
     req.on('timeout', () => {
       req.destroy();
-      resolve({ ok: false, latencyMs: 2500, error: 'TIMEOUT' });
+      finish({ ok: false, latencyMs: 2500, error: 'TIMEOUT' });
     });
 
     req.on('error', () => {
@@ -1046,16 +1062,17 @@ function pingEndpoint(targetUrl) {
         method: 'GET',
         timeout: 2000,
         rejectUnauthorized: false,
-        headers: { 'User-Agent': 'KV-Port-Ping/1.0' }
+        headers: { 'User-Agent': 'KV-Home-Ping/1.0' }
       }, (res) => {
-        resolve({ ok: true, latencyMs: Date.now() - start, status: res.statusCode });
+        res.resume(); // drain stream to immediately free connection
+        finish({ ok: true, latencyMs: Date.now() - start, status: res.statusCode });
       });
       getReq.on('timeout', () => {
         getReq.destroy();
-        resolve({ ok: false, latencyMs: 2000, error: 'TIMEOUT' });
+        finish({ ok: false, latencyMs: 2000, error: 'TIMEOUT' });
       });
       getReq.on('error', (err) => {
-        resolve({ ok: false, latencyMs: Date.now() - start, error: err.code || 'OFFLINE' });
+        finish({ ok: false, latencyMs: Date.now() - start, error: err.code || 'OFFLINE' });
       });
       getReq.end();
     });
@@ -1092,15 +1109,16 @@ function getSystemStatus() {
 // Request Handler
 // -------------------------------------------------------------
 const server = http.createServer(async (req, res) => {
-  // CORS Preflight - Restricted to same origin / safe methods
-  if (req.method === 'OPTIONS') {
-    applySecurityHeaders(res);
-    res.writeHead(204, {
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    });
-    return res.end();
-  }
+  try {
+    // CORS Preflight - Restricted to same origin / safe methods
+    if (req.method === 'OPTIONS') {
+      applySecurityHeaders(res);
+      res.writeHead(204, {
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      });
+      return res.end();
+    }
 
   const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = decodeURIComponent(parsedUrl.pathname);
@@ -1611,6 +1629,15 @@ const server = http.createServer(async (req, res) => {
       </body>
     </html>
   `);
+  } catch (err) {
+    console.error('[Server Unhandled Error]', err);
+    if (!res.headersSent) {
+      applySecurityHeaders(res);
+      sendJson(res, 500, { error: 'Internal server error: ' + (err.message || 'Unknown') });
+    } else {
+      res.end();
+    }
+  }
 });
 
 server.listen(PORT, HOST, () => {

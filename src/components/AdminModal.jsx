@@ -75,16 +75,25 @@ export default function AdminModal({
   const [initialSnapshot, setInitialSnapshot] = useState(() => JSON.stringify(links || []));
   const colorPickerContainerRef = useRef(null);
 
-  // Sync links prop changes
-  const [prevLinks, setPrevLinks] = useState(links);
-  if (links !== prevLinks) {
-    setPrevLinks(links);
-    if (links && links.length > 0) {
-      const cloned = JSON.parse(JSON.stringify(links));
-      setItems(cloned);
-      setInitialSnapshot(JSON.stringify(cloned));
+  // Unsaved changes check
+  const hasUnsavedChanges = useMemo(() => {
+    if (!initialSnapshot) return false;
+    return JSON.stringify(items) !== initialSnapshot;
+  }, [items, initialSnapshot]);
+
+  // External links prop synchronization (only when content differs and modal is clean)
+  const prevLinksJsonRef = useRef(JSON.stringify(links || []));
+  useEffect(() => {
+    const newLinksJson = JSON.stringify(links || []);
+    if (prevLinksJsonRef.current !== newLinksJson) {
+      prevLinksJsonRef.current = newLinksJson;
+      if (links && links.length > 0 && newLinksJson !== JSON.stringify(items) && !hasUnsavedChanges) {
+        const cloned = JSON.parse(newLinksJson);
+        setItems(cloned);
+        setInitialSnapshot(newLinksJson);
+      }
     }
-  }
+  }, [links, items, hasUnsavedChanges]);
 
   // Handle modal open/close reset
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -141,12 +150,13 @@ export default function AdminModal({
     }
   }, [isOpen]);
 
-  // Two-way live preview for links editing
-  useEffect(() => {
-    if (onLivePreviewLinks && isAuthenticated) {
-      onLivePreviewLinks(items);
+  // Centralized items updater that explicitly triggers live preview on user actions only
+  const updateItems = (updated, shouldPreview = true) => {
+    setItems(updated);
+    if (shouldPreview && onLivePreviewLinks && isAuthenticated) {
+      onLivePreviewLinks(updated);
     }
-  }, [items, isAuthenticated, onLivePreviewLinks]);
+  };
 
   // Click outside to close color picker
   useEffect(() => {
@@ -163,11 +173,6 @@ export default function AdminModal({
     };
   }, [colorPickerOpenIdx]);
 
-  // Unsaved changes check
-  const hasUnsavedChanges = useMemo(() => {
-    if (!initialSnapshot) return false;
-    return JSON.stringify(items) !== initialSnapshot;
-  }, [items, initialSnapshot]);
 
   const handleSafeClose = () => {
     if (hasUnsavedChanges) {
@@ -248,7 +253,7 @@ export default function AdminModal({
       updated[index].hoverColor = value;
     }
 
-    setItems(updated);
+    updateItems(updated);
   };
 
   const handleColorSelect = (index, colorHex) => {
@@ -258,7 +263,7 @@ export default function AdminModal({
       color: colorHex,
       hoverColor: colorHex,
     };
-    setItems(updated);
+    updateItems(updated);
   };
 
   const handleDisplayModeChange = (index, mode) => {
@@ -276,7 +281,7 @@ export default function AdminModal({
         updated[index].videoUrl = '/cv-video.mp4';
       }
     }
-    setItems(updated);
+    updateItems(updated);
   };
 
   const handleVideoUpload = async (index, file) => {
@@ -347,7 +352,7 @@ export default function AdminModal({
     const updated = [...items];
     const [moved] = updated.splice(index, 1);
     updated.splice(newIdx, 0, moved);
-    setItems(updated);
+    updateItems(updated);
   };
 
   // Drag and Drop Reordering
@@ -379,7 +384,7 @@ export default function AdminModal({
     const updated = [...items];
     const [draggedItem] = updated.splice(draggedIdx, 1);
     updated.splice(targetIdx, 0, draggedItem);
-    setItems(updated);
+    updateItems(updated);
     setDraggedIdx(null);
     setDragOverIdx(null);
   };
@@ -400,7 +405,7 @@ export default function AdminModal({
       isVideo: false,
       videoUrl: ''
     };
-    setItems([...items, newItem]);
+    updateItems([...items, newItem]);
     setExpandedIds((prev) => new Set([...prev, nextId]));
   };
 
@@ -410,7 +415,7 @@ export default function AdminModal({
       return;
     }
     const updated = items.filter((_, idx) => idx !== index);
-    setItems(updated);
+    updateItems(updated);
     setDeletingId(null);
   };
 
@@ -468,7 +473,7 @@ export default function AdminModal({
     try {
       const parsed = JSON.parse(jsonText);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        setItems(parsed);
+        updateItems(parsed);
         setActiveTab('links');
         alert(`Successfully loaded ${parsed.length} links! Click "Save Changes" to apply.`);
       } else {
@@ -487,8 +492,7 @@ export default function AdminModal({
         iconSlug: slug,
         iconUrl: '',
       };
-      setItems(updated);
-      if (onLivePreviewLinks) onLivePreviewLinks(updated);
+      updateItems(updated);
     }
   };
 
@@ -500,8 +504,7 @@ export default function AdminModal({
         iconSlug: '',
         iconUrl: '',
       };
-      setItems(updated);
-      if (onLivePreviewLinks) onLivePreviewLinks(updated);
+      updateItems(updated);
     }
   };
 
@@ -708,6 +711,13 @@ export default function AdminModal({
                   type="button"
                   onClick={() => {
                     setShowUnsavedWarning(false);
+                    if (initialSnapshot) {
+                      try {
+                        const revert = JSON.parse(initialSnapshot);
+                        setItems(revert);
+                        if (onLivePreviewLinks) onLivePreviewLinks(revert);
+                      } catch {}
+                    }
                     onClose();
                   }}
                   style={{
