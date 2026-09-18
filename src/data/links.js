@@ -100,32 +100,8 @@ export const links = [
         group: "tools",
         order: 5
     },
-{
-        id: 6,
-        title: "Netflix",
-    },
     {
-        id: 7,
-        title: "RM8PFix",
-    },
-    {
-        id: 8,
-        title: "Portal",
-    },
-    {
-        id: 9,
-        title: "Free",
-    },
-    {
-        id: 10,
-        title: "PDF",
-    },
-    {
-        id: 11,
-        title: "JPG",
-    },
-    {
-        id: 12,
+        id: 13,
         title: "IT Utilities",
         subtitle: "Dev Tools",
         url: "https://it.khoavo.myds.me",

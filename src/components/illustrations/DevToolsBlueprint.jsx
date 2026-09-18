@@ -1,14 +1,14 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
+const Iso = ({ children, yOffset = 0 }) => (
+  <g transform={`translate(200, ${180 + yOffset}) scale(1, 0.5) rotate(45)`}>
+    {children}
+  </g>
+);
+
 const DevToolsBlueprint = () => {
   const layerTransition = { duration: 4.5, repeat: Infinity, ease: "easeInOut" };
-
-  const Iso = ({ children, yOffset = 0 }) => (
-    <g transform={`translate(200, ${180 + yOffset}) scale(1, 0.5) rotate(45)`}>
-      {children}
-    </g>
-  );
 
   return (
     <svg viewBox="0 0 400 350" className="w-full h-auto text-blue-600" style={{ stroke: 'currentColor', strokeWidth: 1 }}>

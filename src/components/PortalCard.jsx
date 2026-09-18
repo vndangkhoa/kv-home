@@ -1,6 +1,6 @@
 import React from 'react';
 
-const PortalCard = ({ item, index }) => {
+const PortalCard = ({ item, _index }) => {
   const { title, subtitle, url } = item;
   
   return (

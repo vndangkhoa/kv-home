@@ -8,6 +8,8 @@ services:
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads
+      # Mount Docker socket for automatic container and homelab service discovery
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - PORT=3000
       - HOST=0.0.0.0

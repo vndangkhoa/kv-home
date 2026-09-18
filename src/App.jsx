@@ -1,8 +1,18 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { calculateOptimalGrid } from './utils/gridCalculator';
 import { getVideoFromIndexedDB } from './utils/videoStorage';
+import { getServiceIconUrl } from './utils/iconResolver';
+import { safeSessionStorage } from './utils/safeStorage';
 import AdminModal from './components/AdminModal';
 import defaultLinksData from './data/links.json';
+import defaultSettingsData from './data/settings.json';
+import { THEMES, getTetrominoShape } from './data/themes';
+import { LAYOUTS } from './data/layouts';
+import BentoLayout from './components/layouts/BentoLayout';
+import AnalyticsLayout from './components/layouts/AnalyticsLayout';
+import TerminalLayout from './components/layouts/TerminalLayout';
+import NouveauLayout from './components/layouts/NouveauLayout';
+import KineticItalicLayout from './components/layouts/KineticItalicLayout';
 
 const FALL_DURATION = 0.5;
 const FALL_STAGGER = 0.12;
@@ -159,15 +169,20 @@ function generateTiling(cols, rows, numPieces, rng) {
   return pieces.filter(Boolean);
 }
 
-function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
+function TetrisPiece({ piece, theme, isDark, fallIndex, allLanded }) {
   const [isHovered, setIsHovered] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 500);
   const [resolvedVideoSrc, setResolvedVideoSrc] = useState(piece.videoUrl || (piece.label === 'cv' ? '/cv-video.mp4' : ''));
 
+  const iconUrl = useMemo(() => getServiceIconUrl(piece), [piece]);
+  const hasIcon = iconUrl && !imgError;
   const isVideo = !!(piece.isVideo || piece.label === 'cv');
   const isFeatured = !!piece.featured;
   const isStatic = isVideo || isFeatured;
   const clipId = `clip-${piece.id || piece.label}-${fallIndex}`;
+
+  const shape = useMemo(() => getTetrominoShape(piece.cells), [piece.cells]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 500);
@@ -217,13 +232,21 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
   const handleMouseEnter = () => setIsHovered(true);
   const handleMouseLeave = () => setIsHovered(false);
 
-  const pieceColor = piece.color || piece.hoverColor || '#2196F3';
-  const pieceHoverColor = piece.hoverColor || piece.color || '#2196F3';
+  // Determine base and hover colors based on active theme
+  let pieceColor = piece.color || piece.hoverColor || '#2196F3';
+  let pieceHoverColor = piece.hoverColor || piece.color || '#2196F3';
+
+  if (theme) {
+    if (theme.colorMode === 'authentic-tetris' && theme.pieceColors) {
+      pieceColor = theme.pieceColors[shape] || pieceColor;
+      pieceHoverColor = pieceColor;
+    } else if (theme.colorMode === 'palette-solid' && theme.palette) {
+      pieceColor = theme.palette[fallIndex % theme.palette.length];
+      pieceHoverColor = pieceColor;
+    }
+  }
 
   // Color logic:
-  // Video: transparent to show <video>
-  // Featured (Solid): always display its selected color
-  // Regular: dim gray while resting → vibrant color on hover
   let bgColor;
   if (isVideo) {
     bgColor = 'transparent';
@@ -231,8 +254,10 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
     bgColor = pieceColor;
   } else if (isHovered) {
     bgColor = pieceHoverColor;
-  } else {
+  } else if (theme?.dimResting) {
     bgColor = isDark ? '#333333' : '#e0e0e0';
+  } else {
+    bgColor = pieceColor;
   }
 
   const showText = isMobile ? allLanded : isHovered;
@@ -253,23 +278,49 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
   const ly = labelCell.y - minY;
 
   const labelContent = (
-    <span
+    <div
       style={{
         position: 'absolute',
         bottom: '4px',
         left: '4px',
-        fontSize: 'clamp(6px, 1.2vw, 11px)',
-        fontWeight: '500',
-        textTransform: 'lowercase',
-        color: '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
         zIndex: 2,
-        lineHeight: 1,
-        whiteSpace: 'nowrap',
         pointerEvents: 'none',
+        maxWidth: 'calc(100% - 8px)',
+        overflow: 'hidden',
       }}
     >
-      {piece.label}
-    </span>
+      {hasIcon && (
+        <img
+          src={iconUrl}
+          alt=""
+          loading="lazy"
+          onError={() => setImgError(true)}
+          style={{
+            width: 'clamp(10px, 1.4vw, 14px)',
+            height: 'clamp(10px, 1.4vw, 14px)',
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.6))',
+            flexShrink: 0,
+          }}
+        />
+      )}
+      <span
+        style={{
+          fontSize: 'clamp(6px, 1.2vw, 11px)',
+          fontWeight: '500',
+          textTransform: 'lowercase',
+          color: '#fff',
+          lineHeight: 1,
+          whiteSpace: 'nowrap',
+          textShadow: '0 1px 2px rgba(0,0,0,0.7)',
+        }}
+      >
+        {piece.label}
+      </span>
+    </div>
   );
 
   // Deterministic random delay based on label letters for staggered pulsing
@@ -284,7 +335,7 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
     position: 'relative',
     cursor: piece.link ? 'pointer' : 'default',
     backgroundColor: isVideo ? 'transparent' : bgColor,
-    transition: 'background-color 0.4s ease',
+    transition: 'background-color 0.3s ease, filter 0.3s ease, box-shadow 0.3s ease',
     clipPath: `url(#${clipId})`,
     WebkitClipPath: `url(#${clipId})`,
     display: 'block',
@@ -294,6 +345,24 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
     '--vibrant-color': pieceHoverColor,
     '--dim-color': isFeatured ? pieceColor : (isDark ? '#333333' : '#e0e0e0'),
   };
+
+  // Theme-specific styles
+  if (theme?.style === 'beveled' && !isVideo) {
+    pieceStyle.boxShadow = 'inset 3px 3px 0px rgba(255, 255, 255, 0.45), inset -3px -3px 0px rgba(0, 0, 0, 0.55)';
+  } else if (theme?.style === 'neon') {
+    pieceStyle.filter = isHovered ? `drop-shadow(0 0 10px ${pieceHoverColor})` : `drop-shadow(0 0 4px ${pieceHoverColor}88)`;
+    if (!isHovered && theme.dimResting && !isFeatured && !isVideo) {
+      pieceStyle.backgroundColor = 'rgba(13, 14, 22, 0.88)';
+    }
+  } else if (theme?.style === 'glass') {
+    pieceStyle.backdropFilter = 'blur(10px)';
+    pieceStyle.WebkitBackdropFilter = 'blur(10px)';
+    if (!isHovered && theme.dimResting && !isFeatured && !isVideo) {
+      pieceStyle.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)';
+    }
+  } else if (theme?.style === 'gameboy' && !isVideo) {
+    pieceStyle.boxShadow = 'inset 2px 2px 0px #9bbc0f, inset -2px -2px 0px #0f380f';
+  }
 
   if (isMobile && allLanded && !isStatic) {
     pieceStyle.animation = `colorBlink 6s ease-in-out ${blinkDelay}s infinite`;
@@ -350,6 +419,47 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
           </clipPath>
         </defs>
       </svg>
+      {theme?.style === 'beveled' && !isVideo && (
+        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
+          {piece.cells.map((cell, idx) => {
+            const clx = cell.x - minX;
+            const cly = cell.y - minY;
+            const rx = `calc(${clx} * (var(--cell-w) + var(--grid-gap, 2px)))`;
+            const ry = `calc(${cly} * (var(--cell-h) + var(--grid-gap, 2px)))`;
+            return (
+              <g key={idx}>
+                <rect x={rx} y={ry} width="var(--cell-w)" height="2.5" fill="rgba(255,255,255,0.45)" />
+                <rect x={rx} y={ry} width="2.5" height="var(--cell-h)" fill="rgba(255,255,255,0.45)" />
+                <rect x={rx} y={`calc(${ry} + var(--cell-h) - 2.5px)`} width="var(--cell-w)" height="2.5" fill="rgba(0,0,0,0.5)" />
+                <rect x={`calc(${rx} + var(--cell-w) - 2.5px)`} y={ry} width="2.5" height="var(--cell-h)" fill="rgba(0,0,0,0.5)" />
+              </g>
+            );
+          })}
+        </svg>
+      )}
+      {theme?.style === 'neon' && !isVideo && (
+        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
+          {piece.cells.map((cell, idx) => {
+            const clx = cell.x - minX;
+            const cly = cell.y - minY;
+            const rx = `calc(${clx} * (var(--cell-w) + var(--grid-gap, 2px)))`;
+            const ry = `calc(${cly} * (var(--cell-h) + var(--grid-gap, 2px)))`;
+            return (
+              <rect
+                key={idx}
+                x={rx}
+                y={ry}
+                width="var(--cell-w)"
+                height="var(--cell-h)"
+                fill="none"
+                stroke={pieceHoverColor}
+                strokeWidth="1.5"
+                opacity={isHovered ? "0.95" : "0.45"}
+              />
+            );
+          })}
+        </svg>
+      )}
       {isVideo && resolvedVideoSrc && (
         <video
           key={resolvedVideoSrc}
@@ -391,13 +501,53 @@ function TetrisPiece({ piece, isDark, fallIndex, allLanded }) {
 
 function App() {
   const [isDark, setIsDark] = useState(() => {
-    const hour = new Date().getHours();
-    return hour < 6 || hour >= 18;
+    try {
+      const saved = localStorage.getItem('kv_theme_dark');
+      if (saved !== null) return saved === 'true';
+      if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return true;
+      }
+    } catch {
+      // fallback
+    }
+    return true; // Default to sleek dark mode
   });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    }
+  }, [isDark]);
+
   const [seed, setSeed] = useState(() => Math.random());
-  const [allLanded, setAllLanded] = useState(false);
+  const [landedSeed, setLandedSeed] = useState(() => null);
+  const allLanded = landedSeed === seed;
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 600);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isSplitView, setIsSplitView] = useState(() => {
+    return typeof window !== 'undefined' ? window.innerWidth > 900 : true;
+  });
+  const [layoutHud, setLayoutHud] = useState(null);
+  const layoutHudTimerRef = useRef(null);
+
+  // Load branding & settings from localStorage or initial JSON
+  const [settings, setSettings] = useState(() => {
+    try {
+      const cached = localStorage.getItem('kv_settings_data');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === 'object') return { ...defaultSettingsData, ...parsed };
+      }
+    } catch (e) {
+      console.error('Error loading settings from localStorage:', e);
+    }
+    return defaultSettingsData;
+  });
 
   // Load links from localStorage or initial JSON
   const [links, setLinks] = useState(() => {
@@ -413,7 +563,56 @@ function App() {
     return defaultLinksData;
   });
 
-  // Fetch from backend API on mount
+  // Fetch settings from backend API on mount
+  useEffect(() => {
+    fetch('/api/settings')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && typeof data === 'object') {
+          setSettings(prev => {
+            const merged = { ...prev, ...data };
+            try {
+              localStorage.setItem('kv_settings_data', JSON.stringify(merged));
+            } catch (err) {
+              console.warn('Could not cache settings', err);
+            }
+            return merged;
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Update dynamic document title and favicon from 1-photo branding
+  useEffect(() => {
+    if (settings.title) {
+      document.title = `${settings.title.toUpperCase()} — PORTAL`;
+    }
+    if (settings.logoUrl) {
+      let iconLink = document.querySelector("link[rel~='icon']");
+      if (!iconLink) {
+        iconLink = document.createElement('link');
+        iconLink.rel = 'icon';
+        document.head.appendChild(iconLink);
+      }
+      iconLink.href = settings.logoUrl;
+
+      let appleIconLink = document.querySelector("link[rel='apple-touch-icon']");
+      if (!appleIconLink) {
+        appleIconLink = document.createElement('link');
+        appleIconLink.rel = 'apple-touch-icon';
+        document.head.appendChild(appleIconLink);
+      }
+      appleIconLink.href = settings.logoUrl;
+    }
+  }, [settings.title, settings.logoUrl]);
+
+  // Active theme resolved from settings
+  const currentTheme = useMemo(() => {
+    return THEMES[settings.themeId] || THEMES.classic;
+  }, [settings.themeId]);
+
+  // Fetch links from backend API on mount
   useEffect(() => {
     fetch('/api/links')
       .then(res => res.ok ? res.json() : null)
@@ -422,8 +621,8 @@ function App() {
           setLinks(data);
           try {
             localStorage.setItem('kv_links_data', JSON.stringify(data));
-          } catch (e) {
-            // ignore localStorage quota warnings
+          } catch (err) {
+            console.warn('Could not cache links', err);
           }
         }
       })
@@ -432,17 +631,6 @@ function App() {
       });
   }, []);
 
-  // Keyboard shortcut: Ctrl+Shift+A (or Cmd+Shift+A) to open Admin
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
-        e.preventDefault();
-        setIsAdminOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   // Window resize handler
   useEffect(() => {
@@ -451,10 +639,14 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Is docked split view actively showing on desktop?
+  const showSplit = isAdminOpen && isSplitView && !isMobile;
+
   // Calculate dynamic grid dimensions (cols, rows)
   const { cols, rows } = useMemo(() => {
-    return calculateOptimalGrid(links.length, isMobile);
-  }, [links.length, isMobile]);
+    const effectiveMobile = isMobile || (showSplit && window.innerWidth < 1150);
+    return calculateOptimalGrid(links.length, effectiveMobile);
+  }, [links.length, isMobile, showSplit]);
 
   // Generate layout with tetromino tiling
   const layout = useMemo(() => {
@@ -476,7 +668,7 @@ function App() {
   }, [links, cols, rows, seed]);
 
   // Falling order: bottom pieces first (stacking up like Tetris)
-  const { fallingOrder, fallIndexMap } = useMemo(() => {
+  const { fallIndexMap } = useMemo(() => {
     const sorted = [...layout].sort((a, b) => {
       const maxYA = Math.max(...a.cells.map(c => c.y));
       const maxYB = Math.max(...b.cells.map(c => c.y));
@@ -487,20 +679,28 @@ function App() {
     sorted.forEach((piece, idx) => {
       map[piece.id || piece.label] = idx;
     });
-    return { fallingOrder: sorted, fallIndexMap: map };
+    return { fallIndexMap: map };
   }, [layout]);
 
   const totalFallTime = (layout.length - 1) * FALL_STAGGER + FALL_DURATION;
 
   useEffect(() => {
-    setAllLanded(false);
-    const timer = setTimeout(() => setAllLanded(true), totalFallTime * 1000 + 300);
+    const timer = setTimeout(() => setLandedSeed(seed), totalFallTime * 1000 + 300);
     return () => clearTimeout(timer);
   }, [seed, layout.length, totalFallTime]);
 
-  const toggleTheme = () => setIsDark(!isDark);
+  const toggleTheme = () => {
+    setIsDark(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('kv_theme_dark', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
   const refreshLayout = useCallback(() => {
-    setAllLanded(false);
     setSeed(Math.random());
   }, []);
 
@@ -513,7 +713,7 @@ function App() {
     }
 
     let synced = false;
-    const token = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('kv_admin_token') : null;
+    const token = safeSessionStorage.getItem('kv_admin_token');
     try {
       const res = await fetch('/api/links', {
         method: 'POST',
@@ -526,7 +726,7 @@ function App() {
       if (res.ok) {
         synced = true;
       } else if (res.status === 401) {
-        sessionStorage.removeItem('kv_admin_token');
+        safeSessionStorage.removeItem('kv_admin_token');
         alert('Session expired or unauthorized. Please log in again to sync changes to the server.');
       }
     } catch {
@@ -536,124 +736,438 @@ function App() {
     return { synced };
   };
 
-  const bg = isDark ? '#1a1a1a' : '#ffffff';
-  const headerBg = isDark ? '#1a1a1a' : '#ffffff';
-  const textColor = isDark ? '#fff' : '#000';
-  const borderColor = isDark ? '#444' : '#000';
+  const handleSaveSettings = useCallback(async (newSettings) => {
+    const updated = { ...settings, ...newSettings };
+    setSettings(updated);
+    try {
+      localStorage.setItem('kv_settings_data', JSON.stringify(updated));
+    } catch (err) {
+      console.warn('Could not cache settings locally', err);
+    }
+
+    let synced = false;
+    const token = safeSessionStorage.getItem('kv_admin_token');
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token || ''}`,
+        },
+        body: JSON.stringify(updated),
+      });
+      if (res.ok) {
+        synced = true;
+      }
+    } catch {
+      console.warn('API endpoint for settings not reachable');
+    }
+    return { synced };
+  }, [settings]);
+
+  const handleSelectTheme = (newThemeId) => {
+    handleSaveSettings({ themeId: newThemeId });
+  };
+
+  const triggerLayoutSwitch = useCallback((newLayoutId, shortcutLabel) => {
+    handleSaveSettings({ activeLayout: newLayoutId });
+    const layoutInfo = LAYOUTS[newLayoutId];
+    if (layoutInfo) {
+      if (layoutHudTimerRef.current) clearTimeout(layoutHudTimerRef.current);
+      setLayoutHud({
+        id: newLayoutId,
+        name: layoutInfo.name,
+        badge: layoutInfo.badge || layoutInfo.tag,
+        shortcut: shortcutLabel,
+      });
+      layoutHudTimerRef.current = setTimeout(() => {
+        setLayoutHud(null);
+      }, 1800);
+    }
+  }, [handleSaveSettings]);
+
+  const handleSelectLayout = useCallback((newLayoutId) => {
+    triggerLayoutSwitch(newLayoutId);
+  }, [triggerLayoutSwitch]);
+
+  // Global Keyboard Shortcuts:
+  // - Ctrl+Shift+A (or Cmd+Shift+A) to open Admin
+  // - Alt+1 to Alt+6 to quickly switch layout engine
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Toggle Admin: Ctrl+Shift+A / Cmd+Shift+A
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setIsAdminOpen(prev => !prev);
+        return;
+      }
+
+      // Avoid layout hotkeys if user is actively typing in an input, textarea, or contentEditable
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+      if (isInput) return;
+
+      if (e.altKey && !e.ctrlKey && !e.metaKey) {
+        const layoutKeyMap = {
+          '1': { id: 'dock', shortcut: 'Alt+1' },
+          '2': { id: 'bento', shortcut: 'Alt+2' },
+          '3': { id: 'terminal', shortcut: 'Alt+3' },
+          '4': { id: 'tetris', shortcut: 'Alt+4' },
+          '5': { id: 'nouveau', shortcut: 'Alt+5' },
+          '6': { id: 'kinetic', shortcut: 'Alt+6' },
+        };
+        const match = layoutKeyMap[e.key];
+        if (match) {
+          e.preventDefault();
+          triggerLayoutSwitch(match.id, match.shortcut);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [triggerLayoutSwitch]);
+
+  const bg = isDark ? (currentTheme.pageBg || '#09090c') : '#f8fafc';
+  const headerBg = isDark ? (currentTheme.pageBg || '#09090c') : '#ffffff';
+  const boardBg = isDark ? (currentTheme.boardBg || '#111115') : '#ffffff';
+  const textColor = isDark ? (currentTheme.textColor || '#ffffff') : '#0f172a';
+  const borderColor = isDark ? (currentTheme.borderColor || 'rgba(255, 255, 255, 0.1)') : 'rgba(0, 0, 0, 0.1)';
+
+  const activeLayoutId = settings.activeLayout || 'tetris';
 
   return (
-    <div style={{ height: '100vh', background: bg, padding: '0 10px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <header style={{
+    <div style={{
+      height: '100vh',
+      width: '100vw',
+      background: bg,
+      display: 'flex',
+      flexDirection: 'row',
+      overflow: 'hidden',
+      position: 'relative'
+    }}>
+      {/* Live Dashboard Area */}
+      <div style={{
+        flex: 1,
+        width: showSplit ? 'calc(100vw - min(500px, 45vw))' : '100vw',
+        height: '100vh',
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '8px 12px',
-        background: headerBg,
-        flexWrap: 'wrap',
-        gap: '8px',
-        flexShrink: 0,
+        flexDirection: 'column',
+        overflow: 'hidden',
+        padding: activeLayoutId === 'dock' ? '0' : '0 10px',
+        transition: 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+        minWidth: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
-          <a href="/" style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>Khoa.vo</a>
-          <span style={{ fontSize: '10px', color: isDark ? '#666' : '#999' }} className="header-tagline">where design meets intelligence</span>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <button
-            onClick={() => setIsAdminOpen(true)}
-            title="Admin Login / Link Management (Ctrl+Shift+A)"
-            style={{
-              background: 'none',
-              border: `1px solid ${borderColor}`,
-              padding: '6px 10px',
-              fontSize: '12px',
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-              color: textColor,
-              touchAction: 'manipulation',
+        {activeLayoutId !== 'dock' && (
+        <header style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '8px 16px',
+          background: headerBg,
+          flexWrap: 'wrap',
+          gap: '8px',
+          flexShrink: 0,
+          borderBottom: `1px solid ${borderColor}`,
+          fontFamily: 'var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '600', color: textColor, textDecoration: 'none' }}>
+              {settings.logoUrl && (
+                <img
+                  src={settings.logoUrl}
+                  alt="Logo"
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '6px',
+                    objectFit: 'cover',
+                    border: `1px solid ${borderColor}`,
+                    flexShrink: 0
+                  }}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              )}
+              <span>{settings.title || 'Khoa.vo'}</span>
+            </a>
+            {settings.tagline && (
+              <span style={{ fontSize: '11px', color: currentTheme.subTextColor || (isDark ? '#888' : '#64748b') }} className="header-tagline">
+                {settings.tagline}
+              </span>
+            )}
+          </div>
+
+          {/* Quick Segmented Layout Switcher (Hidden in header by default; managed in Settings / Admin modal) */}
+          {settings.showLayoutSwitcherInHeader && (
+            <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
-            }}
-          >
-            <span>⚙</span>
-            <span style={{ fontSize: '10px' }}>Admin</span>
-          </button>
-          <button
-            onClick={refreshLayout}
-            title="Shuffle Layout"
-            style={{
-              background: 'none',
+              background: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
+              borderRadius: '9px',
+              padding: '3px',
               border: `1px solid ${borderColor}`,
-              padding: '6px 12px',
-              fontSize: '14px',
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-              color: textColor,
-              touchAction: 'manipulation',
-            }}
-          >
-            ↻
-          </button>
-          <button
-            onClick={toggleTheme}
-            title="Toggle Light / Dark Theme"
-            style={{
-              background: 'none',
-              border: `1px solid ${borderColor}`,
-              padding: '6px 12px',
-              fontSize: '14px',
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-              color: textColor,
-              touchAction: 'manipulation',
-            }}
-          >
-            {isDark ? '☀' : '☾'}
-          </button>
-        </div>
-      </header>
+              gap: '2px',
+            }}>
+              {[
+                { id: 'bento', label: 'Bento', icon: '⊞' },
+                { id: 'tetris', label: 'Tetris', icon: '🕹️' },
+                { id: 'dock', label: 'Analytics', icon: '📊' },
+                { id: 'terminal', label: 'Terminal', icon: '>_' },
+                { id: 'nouveau', label: 'Nouveau', icon: '❧' },
+                { id: 'kinetic', label: 'Kinetic', icon: '⚡' },
+              ].map((l) => {
+                const isActive = activeLayoutId === l.id;
+                return (
+                  <button
+                    key={l.id}
+                    onClick={() => handleSelectLayout(l.id)}
+                    style={{
+                      background: isActive ? (isDark ? 'rgba(255, 255, 255, 0.16)' : '#ffffff') : 'transparent',
+                      color: isActive ? textColor : (isDark ? '#888' : '#666'),
+                      border: 'none',
+                      borderRadius: '7px',
+                      padding: '4px 9px',
+                      fontSize: '11px',
+                      fontFamily: 'inherit',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontWeight: isActive ? '600' : '400',
+                      boxShadow: isActive ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title={`Switch to ${l.label} Layout`}
+                  >
+                    <span style={{ fontSize: '11px' }}>{l.icon}</span>
+                    <span>{l.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-      <main 
-        className="tetris-board" 
-        key={seed} 
-        style={{ 
-          background: isDark ? '#222' : '#fff',
-          '--grid-cols': cols,
-          '--grid-rows': rows,
-          gridTemplateColumns: `repeat(${cols}, 1fr)`,
-          gridTemplateRows: `repeat(${rows}, 1fr)`,
-        }}
-      >
-        {layout.map((piece) => (
-          <TetrisPiece
-            key={`${piece.id || piece.label}-${piece.cells.map(c=>`${c.x},${c.y}`).join('_')}`}
-            piece={piece}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              onClick={() => setIsAdminOpen(true)}
+              title="Admin Settings & Customization (Ctrl+Shift+A)"
+              style={{
+                background: 'none',
+                border: `1px solid ${borderColor}`,
+                borderRadius: '7px',
+                padding: '6px 10px',
+                fontSize: '12px',
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+                color: textColor,
+                touchAction: 'manipulation',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}
+            >
+              <span>⚙</span>
+              <span style={{ fontSize: '11px', fontWeight: '500' }}>Admin</span>
+            </button>
+
+            {/* Shuffle is only applicable to Tetris layout */}
+            {activeLayoutId === 'tetris' && (
+              <button
+                onClick={refreshLayout}
+                title="Shuffle Tetris Layout / Re-roll"
+                style={{
+                  background: 'none',
+                  border: `1px solid ${borderColor}`,
+                  borderRadius: '7px',
+                  padding: '6px 12px',
+                  fontSize: '14px',
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  color: textColor,
+                  touchAction: 'manipulation',
+                }}
+              >
+                ↻
+              </button>
+            )}
+
+            <button
+              onClick={toggleTheme}
+              title="Toggle Light / Dark Theme"
+              style={{
+                background: 'none',
+                border: `1px solid ${borderColor}`,
+                borderRadius: '7px',
+                padding: '6px 12px',
+                fontSize: '13px',
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+                color: textColor,
+                touchAction: 'manipulation',
+              }}
+            >
+              {isDark ? '☀' : '☾'}
+            </button>
+          </div>
+        </header>
+        )}
+
+        {/* Dynamic Multi-Layout Strategy Switcher */}
+        {activeLayoutId === 'bento' && (
+          <BentoLayout
+            links={links}
             isDark={isDark}
-            fallIndex={fallIndexMap[piece.id || piece.label] ?? 0}
-            allLanded={allLanded}
+            settings={settings}
           />
-        ))}
-      </main>
+        )}
+        {activeLayoutId === 'dock' && (
+          <AnalyticsLayout
+            links={links}
+            isDark={isDark}
+            settings={settings}
+            onSaveSettings={handleSaveSettings}
+            onSelectLayout={triggerLayoutSwitch}
+            onOpenAdmin={() => setIsAdminOpen(true)}
+            toggleTheme={toggleTheme}
+          />
+        )}
+        {activeLayoutId === 'terminal' && (
+          <TerminalLayout
+            links={links}
+            isDark={isDark}
+            settings={settings}
+            onSaveSettings={handleSaveSettings}
+            onSelectLayout={triggerLayoutSwitch}
+            onOpenAdmin={() => setIsAdminOpen(true)}
+          />
+        )}
+        {activeLayoutId === 'nouveau' && (
+          <NouveauLayout
+            links={links}
+            isDark={isDark}
+            settings={settings}
+          />
+        )}
+        {activeLayoutId === 'kinetic' && (
+          <KineticItalicLayout
+            links={links}
+            isDark={isDark}
+            settings={settings}
+          />
+        )}
+        {activeLayoutId === 'tetris' && (
+          <main 
+            className="tetris-board" 
+            key={seed} 
+            style={{ 
+              background: boardBg,
+              '--grid-cols': cols,
+              '--grid-rows': rows,
+              '--grid-gap': currentTheme.gridGap || '2px',
+              gridTemplateColumns: `repeat(${cols}, 1fr)`,
+              gridTemplateRows: `repeat(${rows}, 1fr)`,
+            }}
+          >
+            {layout.map((piece) => (
+              <TetrisPiece
+                key={`${piece.id || piece.label}-${piece.cells.map(c=>`${c.x},${c.y}`).join('_')}`}
+                piece={piece}
+                theme={currentTheme}
+                isDark={isDark}
+                fallIndex={fallIndexMap[piece.id || piece.label] ?? 0}
+                allLanded={allLanded}
+              />
+            ))}
+          </main>
+        )}
 
-      <footer style={{
-        padding: '8px 20px',
-        fontSize: '10px',
-        color: isDark ? '#888' : '#666',
-        width: '100%',
-        maxWidth: '500px',
-        margin: '0 auto',
-        textAlign: 'center',
-        flexShrink: 0,
-      }}>
-        <p>© {new Date().getFullYear()} — Khoa.vo</p>
-      </footer>
+        {activeLayoutId !== 'dock' && (
+        <footer style={{
+          padding: '8px 20px',
+          fontSize: '11px',
+          color: currentTheme.subTextColor || (isDark ? '#888' : '#666'),
+          width: '100%',
+          maxWidth: '500px',
+          margin: '0 auto',
+          textAlign: 'center',
+          flexShrink: 0,
+          fontFamily: 'var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)',
+          letterSpacing: '0.2px',
+        }}>
+          <p>© {new Date().getFullYear()} — {settings.title || 'Khoa.vo'}</p>
+        </footer>
+        )}
+      </div>
 
-      {/* Admin Management Modal */}
+      {/* Dynamic Floating HUD Notification on Layout Switch */}
+      {layoutHud && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '28px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '8px 18px',
+            borderRadius: '24px',
+            background: isDark
+              ? 'rgba(15, 23, 42, 0.92)'
+              : 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: `1px solid ${isDark ? 'rgba(56, 189, 248, 0.35)' : 'rgba(0, 0, 0, 0.12)'}`,
+            boxShadow: isDark
+              ? '0 16px 36px -6px rgba(0, 0, 0, 0.8), 0 0 20px rgba(56, 189, 248, 0.2)'
+              : '0 12px 28px -4px rgba(15, 23, 42, 0.15)',
+            color: isDark ? '#ffffff' : '#0f172a',
+            fontSize: '12.5px',
+            fontWeight: '600',
+            pointerEvents: 'none',
+            animation: 'hudSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        >
+          <div style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: '#38bdf8',
+            boxShadow: '0 0 8px #38bdf8',
+          }} />
+          <span>Active Engine: <strong style={{ color: isDark ? '#38bdf8' : '#0284c7' }}>{layoutHud.name}</strong></span>
+          {layoutHud.shortcut && (
+            <kbd style={{
+              fontSize: '10px',
+              padding: '2px 6px',
+              borderRadius: '5px',
+              background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+              color: isDark ? '#94a3b8' : '#64748b',
+              fontFamily: 'monospace',
+              fontWeight: '700',
+              border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.08)'
+            }}>
+              {layoutHud.shortcut}
+            </kbd>
+          )}
+        </div>
+      )}
+
+      {/* Admin Management Modal / Split View Dock */}
       <AdminModal
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}
         links={links}
         onSaveLinks={handleSaveLinks}
+        onLivePreviewLinks={(previewLinks) => setLinks(previewLinks)}
+        settings={settings}
+        onSaveSettings={handleSaveSettings}
+        onLivePreviewSettings={(previewSettings) => setSettings(prev => ({ ...prev, ...previewSettings }))}
+        currentTheme={currentTheme}
+        onSelectTheme={handleSelectTheme}
+        activeLayout={activeLayoutId}
+        onSelectLayout={handleSelectLayout}
+        isSplitView={isSplitView}
+        onToggleSplitView={() => setIsSplitView(prev => !prev)}
         isDark={isDark}
         gridInfo={{ cols, rows }}
       />

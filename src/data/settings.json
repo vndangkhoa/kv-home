@@ -1,0 +1,59 @@
+{
+  "title": "KV-PORT",
+  "tagline": "where design meets intelligence",
+  "logoUrl": "",
+  "themeId": "minimal",
+  "activeLayout": "bento",
+  "widgets": {
+    "clock": {
+      "format24": true,
+      "showSeconds": false,
+      "showGreeting": true,
+      "worldClocks": [
+        {
+          "label": "UTC",
+          "timezone": "UTC"
+        },
+        {
+          "label": "Tokyo",
+          "timezone": "Asia/Tokyo"
+        }
+      ]
+    },
+    "weather": {
+      "enabled": true,
+      "unit": "celsius",
+      "city": "Ho Chi Minh City",
+      "latitude": 10.823,
+      "longitude": 106.63
+    },
+    "news": {
+      "topStrip": {
+        "enabled": true,
+        "feed": "vnexpress",
+        "speed": "slow",
+        "customUrl": ""
+      },
+      "bottomStrip": {
+        "enabled": true,
+        "feed": "tuoitre",
+        "speed": "slow",
+        "customUrl": ""
+      }
+    }
+  },
+  "terminal": {
+    "theme": "white",
+    "width": "boxed",
+    "fontSize": "12px",
+    "density": "normal",
+    "crtEffect": false,
+    "showBanner": true,
+    "showExec": true,
+    "bannerText": "KV HOME",
+    "bannerFont": "ansi_shadow",
+    "bannerCustom": "",
+    "bannerGlow": false
+  },
+  "showLayoutSwitcherInHeader": false
+}
