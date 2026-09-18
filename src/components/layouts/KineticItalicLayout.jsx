@@ -115,6 +115,10 @@ function KineticTicker({ linksCount, isDark, accentColor }) {
         fontWeight: '700',
         letterSpacing: '0.16em',
         userSelect: 'none',
+        position: 'sticky',
+        top: 0,
+        zIndex: 40,
+        boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.5)' : '0 2px 10px rgba(0,0,0,0.08)',
       }}
     >
       <div

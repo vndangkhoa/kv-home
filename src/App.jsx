@@ -845,7 +845,8 @@ function App() {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        padding: activeLayoutId === 'dock' ? '0' : '0 10px',
+        boxSizing: 'border-box',
+        padding: (activeLayoutId === 'dock' || activeLayoutId === 'kinetic') ? '0' : '0 10px',
         transition: 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
         minWidth: 0,
       }}>
