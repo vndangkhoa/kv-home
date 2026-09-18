@@ -589,7 +589,7 @@ function apiPlugin() {
         const q = parsed.searchParams.get('q');
         if (!q || q.trim().length < 2) return sendJson(res, 200, { results: [] });
         const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q.trim())}&count=6&language=en&format=json`;
-        const resp = await fetch(geoUrl, { headers: { 'User-Agent': 'kv-portal/1.0' } });
+        const resp = await fetch(geoUrl, { headers: { 'User-Agent': 'kv-home/1.0' } });
         if (resp.ok) {
           const data = await resp.json();
           return sendJson(res, 200, { results: data.results || [] });
@@ -606,7 +606,7 @@ function apiPlugin() {
         const lat = parsed.searchParams.get('latitude') || '10.823';
         const lon = parsed.searchParams.get('longitude') || '106.63';
         const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&timezone=auto`;
-        const resp = await fetch(weatherUrl, { headers: { 'User-Agent': 'kv-portal/1.0' } });
+        const resp = await fetch(weatherUrl, { headers: { 'User-Agent': 'kv-home/1.0' } });
         if (resp.ok) {
           const data = await resp.json();
           return sendJson(res, 200, data);

@@ -1170,7 +1170,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q.trim())}&count=6&language=en&format=json`;
       const resp = await fetch(geoUrl, {
-        headers: { 'User-Agent': 'kv-portal/1.0' }
+        headers: { 'User-Agent': 'kv-home/1.0' }
       });
       if (resp.ok) {
         const data = await resp.json();
@@ -1189,7 +1189,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&timezone=auto`;
       const resp = await fetch(weatherUrl, {
-        headers: { 'User-Agent': 'kv-portal/1.0' }
+        headers: { 'User-Agent': 'kv-home/1.0' }
       });
       if (resp.ok) {
         const data = await resp.json();
