@@ -103,16 +103,23 @@ function KineticTicker({ linksCount, isDark, accentColor }) {
     <div
       style={{
         width: '100%',
+        height: '32px',
+        minHeight: '32px',
+        maxHeight: '32px',
+        boxSizing: 'border-box',
+        display: 'flex',
+        alignItems: 'center',
         overflow: 'hidden',
         whiteSpace: 'nowrap',
         background: isDark ? '#050507' : '#111114',
         color: accentColor,
         borderTop: `1px solid ${accentColor}33`,
         borderBottom: `1.5px solid ${accentColor}`,
-        padding: '7px 0',
+        padding: '0',
         fontFamily: '"Space Mono", monospace',
         fontSize: '11px',
         fontWeight: '700',
+        lineHeight: 1,
         letterSpacing: '0.16em',
         userSelect: 'none',
         position: 'sticky',
@@ -123,15 +130,17 @@ function KineticTicker({ linksCount, isDark, accentColor }) {
     >
       <div
         style={{
-          display: 'inline-flex',
+          display: 'flex',
+          alignItems: 'center',
           gap: '36px',
           animation: 'kineticMarquee 26s linear infinite',
+          willChange: 'transform',
         }}
       >
         {[...items, ...items, ...items].map((t, idx) => (
-          <span key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '9px', opacity: 0.8 }}>✛</span>
-            <span>{t}</span>
+          <span key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', lineHeight: 1, flexShrink: 0 }}>
+            <span style={{ fontSize: '9px', opacity: 0.8, lineHeight: 1 }}>✛</span>
+            <span style={{ lineHeight: 1 }}>{t}</span>
           </span>
         ))}
       </div>
