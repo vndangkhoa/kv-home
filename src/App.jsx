@@ -384,82 +384,66 @@ function TetrisPiece({ piece, theme, isDark, fallIndex, allLanded }) {
       onMouseLeave={handleMouseLeave}
       {...linkProps}
     >
-      <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}>
+      <svg style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }} aria-hidden="true">
         <defs>
-          <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
+          <clipPath id={clipId} clipPathUnits="objectBoundingBox">
             {piece.cells.map((cell, idx) => {
               const clx = cell.x - minX;
               const cly = cell.y - minY;
-
-              const hasLeft = piece.cells.some(c => c.x === cell.x - 1 && c.y === cell.y);
-              const hasRight = piece.cells.some(c => c.x === cell.x + 1 && c.y === cell.y);
-              const hasTop = piece.cells.some(c => c.x === cell.x && c.y === cell.y - 1);
-              const hasBottom = piece.cells.some(c => c.x === cell.x && c.y === cell.y + 1);
-
-              const leftExtend = hasLeft ? 'var(--grid-gap, 2px) / 2' : '0px';
-              const rightExtend = hasRight ? 'var(--grid-gap, 2px) / 2' : '0px';
-              const topExtend = hasTop ? 'var(--grid-gap, 2px) / 2' : '0px';
-              const bottomExtend = hasBottom ? 'var(--grid-gap, 2px) / 2' : '0px';
-
-              const rx = `calc(${clx} * (var(--cell-w) + var(--grid-gap, 2px)) - ${leftExtend})`;
-              const ry = `calc(${cly} * (var(--cell-h) + var(--grid-gap, 2px)) - ${topExtend})`;
-              const rw = `calc(var(--cell-w) + ${leftExtend} + ${rightExtend})`;
-              const rh = `calc(var(--cell-h) + ${topExtend} + ${bottomExtend})`;
-
               return (
                 <rect
                   key={idx}
-                  x={rx}
-                  y={ry}
-                  width={rw}
-                  height={rh}
+                  x={clx / W}
+                  y={cly / H}
+                  width={1 / W}
+                  height={1 / H}
                 />
               );
             })}
           </clipPath>
         </defs>
       </svg>
-      {theme?.style === 'beveled' && !isVideo && (
-        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
-          {piece.cells.map((cell, idx) => {
-            const clx = cell.x - minX;
-            const cly = cell.y - minY;
-            const rx = `calc(${clx} * (var(--cell-w) + var(--grid-gap, 2px)))`;
-            const ry = `calc(${cly} * (var(--cell-h) + var(--grid-gap, 2px)))`;
-            return (
-              <g key={idx}>
-                <rect x={rx} y={ry} width="var(--cell-w)" height="2.5" fill="rgba(255,255,255,0.45)" />
-                <rect x={rx} y={ry} width="2.5" height="var(--cell-h)" fill="rgba(255,255,255,0.45)" />
-                <rect x={rx} y={`calc(${ry} + var(--cell-h) - 2.5px)`} width="var(--cell-w)" height="2.5" fill="rgba(0,0,0,0.5)" />
-                <rect x={`calc(${rx} + var(--cell-w) - 2.5px)`} y={ry} width="2.5" height="var(--cell-h)" fill="rgba(0,0,0,0.5)" />
-              </g>
-            );
-          })}
-        </svg>
-      )}
-      {theme?.style === 'neon' && !isVideo && (
-        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
-          {piece.cells.map((cell, idx) => {
-            const clx = cell.x - minX;
-            const cly = cell.y - minY;
-            const rx = `calc(${clx} * (var(--cell-w) + var(--grid-gap, 2px)))`;
-            const ry = `calc(${cly} * (var(--cell-h) + var(--grid-gap, 2px)))`;
-            return (
-              <rect
-                key={idx}
-                x={rx}
-                y={ry}
-                width="var(--cell-w)"
-                height="var(--cell-h)"
-                fill="none"
-                stroke={pieceHoverColor}
-                strokeWidth="1.5"
-                opacity={isHovered ? "0.95" : "0.45"}
-              />
-            );
-          })}
-        </svg>
-      )}
+      {theme?.style === 'beveled' && !isVideo && piece.cells.map((cell, idx) => {
+        const clx = cell.x - minX;
+        const cly = cell.y - minY;
+        return (
+          <div
+            key={idx}
+            style={{
+              position: 'absolute',
+              left: `calc(${clx} * (var(--cell-w) + var(--grid-gap, 2px)))`,
+              top: `calc(${cly} * (var(--cell-h) + var(--grid-gap, 2px)))`,
+              width: 'var(--cell-w)',
+              height: 'var(--cell-h)',
+              boxShadow: 'inset 2.5px 2.5px 0px rgba(255,255,255,0.45), inset -2.5px -2.5px 0px rgba(0,0,0,0.5)',
+              boxSizing: 'border-box',
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+          />
+        );
+      })}
+      {theme?.style === 'neon' && !isVideo && piece.cells.map((cell, idx) => {
+        const clx = cell.x - minX;
+        const cly = cell.y - minY;
+        return (
+          <div
+            key={idx}
+            style={{
+              position: 'absolute',
+              left: `calc(${clx} * (var(--cell-w) + var(--grid-gap, 2px)))`,
+              top: `calc(${cly} * (var(--cell-h) + var(--grid-gap, 2px)))`,
+              width: 'var(--cell-w)',
+              height: 'var(--cell-h)',
+              border: `1.5px solid ${pieceHoverColor}`,
+              boxSizing: 'border-box',
+              opacity: isHovered ? 0.95 : 0.45,
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+          />
+        );
+      })}
       {isVideo && resolvedVideoSrc && (
         <video
           key={resolvedVideoSrc}
