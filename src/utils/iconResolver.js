@@ -219,7 +219,7 @@ export const ICON_MAP = {
   it: 'it-tools',
 };
 
-export const CDN_BASE = 'https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/svg';
+export const CDN_BASE = 'https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons@master/svg';
 
 /**
  * Returns the resolved WalkxCode slug for a service item, 'custom' for explicit URLs, or null if unmapped.

@@ -652,17 +652,23 @@ function matchCatalogEntry(name, image, port, bannerTitle) {
   return null;
 }
 
-function probeTcpPort(host, port, timeoutMs = 800) {
+function probeTcpPort(host, port, timeoutMs = 400) {
   return new Promise((resolve) => {
     const socket = new net.Socket();
     let isDone = false;
+    const timer = setTimeout(() => {
+      done(false);
+    }, timeoutMs);
+
     const done = (val) => {
       if (!isDone) {
         isDone = true;
-        socket.destroy();
+        clearTimeout(timer);
+        try { socket.destroy(); } catch {}
         resolve(val);
       }
     };
+
     socket.setTimeout(timeoutMs);
     socket.once('connect', () => done(true));
     socket.once('timeout', () => done(false));
@@ -675,15 +681,27 @@ function probeTcpPort(host, port, timeoutMs = 800) {
   });
 }
 
-function grabHttpBanner(host, port, isHttps = false, timeoutMs = 1200) {
+function grabHttpBanner(host, port, isHttps = false, timeoutMs = 500) {
   return new Promise((resolve) => {
     const client = isHttps ? https : http;
     const protocol = isHttps ? 'https' : 'http';
+    let settled = false;
+    let req = null;
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        if (req) {
+          try { req.destroy(); } catch {}
+        }
+        resolve(null);
+      }
+    }, timeoutMs);
+
     try {
-      const req = client.get(
+      req = client.get(
         `${protocol}://${host}:${port}/`,
         {
-          timeout: timeoutMs,
           rejectUnauthorized: false,
           headers: { 'User-Agent': 'KV-Port-Discovery/1.0' }
         },
@@ -691,24 +709,51 @@ function grabHttpBanner(host, port, isHttps = false, timeoutMs = 1200) {
           let body = '';
           res.on('data', (chunk) => {
             body += chunk;
-            if (body.length > 32768) res.destroy();
+            if (body.length > 16384) {
+              res.destroy();
+            }
           });
           res.on('end', () => {
-            const titleMatch = body.match(/<title[^>]*>([^<]+)<\/title>/i);
-            const title = titleMatch ? cleanText(titleMatch[1].trim()) : '';
-            const serverHeader = res.headers['server'] || '';
-            const locationHeader = res.headers['location'] || '';
-            resolve({ statusCode: res.statusCode, title, serverHeader, locationHeader });
+            if (!settled) {
+              settled = true;
+              clearTimeout(timer);
+              const titleMatch = body.match(/<title[^>]*>([^<]+)<\/title>/i);
+              const title = titleMatch ? cleanText(titleMatch[1].trim()) : '';
+              const serverHeader = res.headers['server'] || '';
+              const locationHeader = res.headers['location'] || '';
+              resolve({ statusCode: res.statusCode, title, serverHeader, locationHeader });
+            }
+          });
+          res.on('error', () => {
+            if (!settled) {
+              settled = true;
+              clearTimeout(timer);
+              resolve(null);
+            }
           });
         }
       );
-      req.on('error', () => resolve(null));
+      req.on('error', () => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve(null);
+        }
+      });
       req.on('timeout', () => {
-        req.destroy();
-        resolve(null);
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          try { req.destroy(); } catch {}
+          resolve(null);
+        }
       });
     } catch {
-      resolve(null);
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(null);
+      }
     }
   });
 }
@@ -764,7 +809,7 @@ async function runAutoDiscovery({ host = '127.0.0.1', scanDocker = true, scanPor
   if (scanDocker) {
     try {
       const containers = await queryDockerContainers();
-      for (const c of containers) {
+      await Promise.all(containers.map(async (c) => {
         const rawName = (c.Names && c.Names[0]) || '';
         const name = rawName.replace(/^\//, '');
         const image = c.Image || '';
@@ -772,7 +817,7 @@ async function runAutoDiscovery({ host = '127.0.0.1', scanDocker = true, scanPor
 
         // Skip internal auxiliary containers / databases that are not web applications
         const isAuxiliary = /(postgres|mysql|mariadb|redis|dragonfly|mongo|companion|downloader|db$)/i.test(`${image} ${name}`);
-        if (isAuxiliary) continue;
+        if (isAuxiliary) return;
 
         // Prioritize host-accessible PublicPort
         const pubPortObj = ports.find(p => p.PublicPort);
@@ -781,17 +826,19 @@ async function runAutoDiscovery({ host = '127.0.0.1', scanDocker = true, scanPor
         const port = hostPort || (isHostNet ? (ports[0]?.PrivatePort || null) : null);
 
         // Skip containers without reachable ports on the host
-        if (!port) continue;
-        if (seenPorts.has(port)) continue;
+        if (!port) return;
+        if (seenPorts.has(port)) return;
 
         // Skip KV-Port itself if local
-        if (isLocalTarget && port === PORT) continue;
+        if (isLocalTarget && port === PORT) return;
 
-        // Try probing HTTP title if port is accessible
+        seenPorts.add(port);
+
+        // Only probe HTTP banner if local target and not matched by name
         let bannerTitle = '';
-        if (port) {
+        if (isLocalTarget && port) {
           const isHttps = port === 443 || port === 8443 || port === 9443 || port === 8006 || port === 5001;
-          const banner = await grabHttpBanner(host, port, isHttps, 600);
+          const banner = await grabHttpBanner('127.0.0.1', port, isHttps, 400);
           if (banner?.title) bannerTitle = banner.title;
         }
 
@@ -806,7 +853,6 @@ async function runAutoDiscovery({ host = '127.0.0.1', scanDocker = true, scanPor
           ? `http${(port === 443 || port === 8443 || port === 9443 || port === 8006 || port === 5001) ? 's' : ''}://${host}:${port}`
           : `http://${host}`;
 
-        if (port) seenPorts.add(port);
         seenNames.add(title.toLowerCase());
 
         discovered.push({
@@ -826,7 +872,7 @@ async function runAutoDiscovery({ host = '127.0.0.1', scanDocker = true, scanPor
           containerName: name,
           imageName: image,
         });
-      }
+      }));
     } catch (err) {
       console.warn('[Discovery] Docker scan error:', err.message);
     }
@@ -839,48 +885,48 @@ async function runAutoDiscovery({ host = '127.0.0.1', scanDocker = true, scanPor
     // Filter out our own port
     const candidatePorts = portsToProbe.filter(p => !(isLocalTarget && p === PORT));
 
-    // Probe in chunks to avoid overwhelming sockets
-    const chunkSize = 15;
-    for (let i = 0; i < candidatePorts.length; i += chunkSize) {
-      const chunk = candidatePorts.slice(i, i + chunkSize);
-      await Promise.all(chunk.map(async (port) => {
-        const isOpen = await probeTcpPort(host, port, 600);
-        if (!isOpen) return;
+    // Probe ALL candidate ports concurrently in ~400ms
+    const openPorts = [];
+    await Promise.all(candidatePorts.map(async (port) => {
+      const isOpen = await probeTcpPort(host, port, 400);
+      if (isOpen) openPorts.push(port);
+    }));
 
-        seenPorts.add(port);
-        const isHttps = port === 443 || port === 8443 || port === 9443 || port === 8006 || port === 5001;
-        const banner = await grabHttpBanner(host, port, isHttps, 1000);
-        const bannerTitle = banner?.title || '';
+    // For open ports, grab banner concurrently
+    await Promise.all(openPorts.map(async (port) => {
+      seenPorts.add(port);
+      const isHttps = port === 443 || port === 8443 || port === 9443 || port === 8006 || port === 5001;
+      const banner = await grabHttpBanner(host, port, isHttps, 600);
+      const bannerTitle = banner?.title || '';
 
-        const match = matchCatalogEntry('', '', port, bannerTitle);
-        const title = (bannerTitle && bannerTitle.length < 30) ? bannerTitle : (match ? match.name : `Service on :${port}`);
-        const subtitle = match ? match.subtitle : 'Network Service';
-        const group = match ? match.group : 'tools';
-        const iconSlug = match ? match.iconSlug : 'server';
-        const color = match ? match.color : '#00BCD4';
+      const match = matchCatalogEntry('', '', port, bannerTitle);
+      const title = (bannerTitle && bannerTitle.length < 30) ? bannerTitle : (match ? match.name : `Service on :${port}`);
+      const subtitle = match ? match.subtitle : 'Network Service';
+      const group = match ? match.group : 'tools';
+      const iconSlug = match ? match.iconSlug : 'server';
+      const color = match ? match.color : '#00BCD4';
 
-        const linkUrl = `http${isHttps ? 's' : ''}://${host}:${port}`;
+      const linkUrl = `http${isHttps ? 's' : ''}://${host}:${port}`;
 
-        if (!seenNames.has(title.toLowerCase())) {
-          seenNames.add(title.toLowerCase());
-          discovered.push({
-            id: Date.now() + Math.floor(Math.random() * 100000),
-            label: (match?.keywords?.[0] || `port-${port}`).slice(0, 24),
-            title,
-            subtitle,
-            link: linkUrl,
-            group,
-            iconSlug,
-            color,
-            hoverColor: color,
-            featured: false,
-            isVideo: false,
-            port,
-            source: 'port_probe',
-          });
-        }
-      }));
-    }
+      if (!seenNames.has(title.toLowerCase())) {
+        seenNames.add(title.toLowerCase());
+        discovered.push({
+          id: Date.now() + Math.floor(Math.random() * 100000),
+          label: (match?.keywords?.[0] || `port-${port}`).slice(0, 24),
+          title,
+          subtitle,
+          link: linkUrl,
+          group,
+          iconSlug,
+          color,
+          hoverColor: color,
+          featured: false,
+          isVideo: false,
+          port,
+          source: 'port_probe',
+        });
+      }
+    }));
   }
 
   // 3. Mark items already existing in dashboard links
@@ -1556,12 +1602,19 @@ const server = http.createServer(async (req, res) => {
       const currentLinks = readLinks();
       console.log(`[Discovery] Starting scan for target: ${host} (Docker: ${scanDocker}, Ports: ${scanPorts})...`);
 
-      const discovered = await runAutoDiscovery({
-        host,
-        scanDocker,
-        scanPorts,
-        currentLinks,
-      });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Discovery scan timed out after 10s')), 10000)
+      );
+
+      const discovered = await Promise.race([
+        runAutoDiscovery({
+          host,
+          scanDocker,
+          scanPorts,
+          currentLinks,
+        }),
+        timeoutPromise,
+      ]);
 
       console.log(`[Discovery] Found ${discovered.length} candidate services on ${host}.`);
       return sendJson(res, 200, {

@@ -39,12 +39,9 @@ export default function DiscoveryTab({
 }) {
   const { border, text, subText, inputBg, inputBorder, badgeBg } = tokens;
 
-  // Scan settings state
-  const defaultHost = typeof window !== 'undefined' && window.location.hostname
-    ? window.location.hostname
-    : '127.0.0.1';
-
-  const [targetHost, setTargetHost] = useState(defaultHost);
+  // Scan settings state - default to local host for container & homelab discovery
+  const defaultHost = '127.0.0.1';
+  const [targetHost, setTargetHost] = useState('127.0.0.1');
   const [scanDocker, setScanDocker] = useState(true);
   const [scanPorts, setScanPorts] = useState(true);
 

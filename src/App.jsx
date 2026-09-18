@@ -172,7 +172,7 @@ function generateTiling(cols, rows, numPieces, rng) {
 function TetrisPiece({ piece, theme, isDark, fallIndex, allLanded }) {
   const [isHovered, setIsHovered] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 500);
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 500px)').matches : false));
   const [resolvedVideoSrc, setResolvedVideoSrc] = useState(piece.videoUrl || (piece.label === 'cv' ? '/cv-video.mp4' : ''));
 
   const iconUrl = useMemo(() => getServiceIconUrl(piece), [piece]);
@@ -185,7 +185,7 @@ function TetrisPiece({ piece, theme, isDark, fallIndex, allLanded }) {
   const shape = useMemo(() => getTetrominoShape(piece.cells), [piece.cells]);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 500);
+    const handleResize = () => setIsMobile(window.matchMedia ? window.matchMedia('(max-width: 500px)').matches : window.innerWidth <= 500);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -527,10 +527,10 @@ function App() {
   const [seed, setSeed] = useState(() => Math.random());
   const [landedSeed, setLandedSeed] = useState(() => null);
   const allLanded = landedSeed === seed;
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 600);
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 600px)').matches : false));
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isSplitView, setIsSplitView] = useState(() => {
-    return typeof window !== 'undefined' ? window.innerWidth > 900 : true;
+    return typeof window !== 'undefined' ? (window.matchMedia ? window.matchMedia('(min-width: 901px)').matches : true) : true;
   });
   const [layoutHud, setLayoutHud] = useState(null);
   const layoutHudTimerRef = useRef(null);
@@ -634,7 +634,7 @@ function App() {
 
   // Window resize handler
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 600);
+    const handleResize = () => setIsMobile(window.matchMedia ? window.matchMedia('(max-width: 600px)').matches : window.innerWidth <= 600);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -644,7 +644,8 @@ function App() {
 
   // Calculate dynamic grid dimensions (cols, rows)
   const { cols, rows } = useMemo(() => {
-    const effectiveMobile = isMobile || (showSplit && window.innerWidth < 1150);
+    const isNarrowSplit = showSplit && (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 1149px)').matches : false);
+    const effectiveMobile = isMobile || isNarrowSplit;
     return calculateOptimalGrid(links.length, effectiveMobile);
   }, [links.length, isMobile, showSplit]);
 
