@@ -81,6 +81,14 @@ export default function AdminModal({
     return JSON.stringify(items) !== initialSnapshot;
   }, [items, initialSnapshot]);
 
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 768px)').matches : false));
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.matchMedia ? window.matchMedia('(max-width: 768px)').matches : window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // External links prop synchronization (only when content differs and modal is clean)
   const prevLinksJsonRef = useRef(JSON.stringify(links || []));
   useEffect(() => {
@@ -89,6 +97,7 @@ export default function AdminModal({
       prevLinksJsonRef.current = newLinksJson;
       if (links && links.length > 0 && newLinksJson !== JSON.stringify(items) && !hasUnsavedChanges) {
         const cloned = JSON.parse(newLinksJson);
+        /* eslint-disable-next-line react-hooks/set-state-in-effect */
         setItems(cloned);
         setInitialSnapshot(newLinksJson);
       }
@@ -626,7 +635,7 @@ export default function AdminModal({
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 9999,
-        padding: '16px',
+        padding: isMobile ? '0px' : '16px',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       }}
       onClick={(e) => {
@@ -647,11 +656,12 @@ export default function AdminModal({
         } : {
           background: bg,
           color: text,
-          border: `1px solid ${border}`,
-          borderRadius: '10px',
+          border: isMobile ? 'none' : `1px solid ${border}`,
+          borderRadius: isMobile ? '0px' : '10px',
           width: '100%',
-          maxWidth: '890px',
-          maxHeight: '92vh',
+          maxWidth: isMobile ? '100vw' : '890px',
+          height: isMobile ? '100%' : 'auto',
+          maxHeight: isMobile ? '100dvh' : '92vh',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 24px 48px -12px rgba(0,0,0,0.6)',
@@ -716,7 +726,9 @@ export default function AdminModal({
                         const revert = JSON.parse(initialSnapshot);
                         setItems(revert);
                         if (onLivePreviewLinks) onLivePreviewLinks(revert);
-                      } catch {}
+                      } catch {
+                        // ignore revert error
+                      }
                     }
                     onClose();
                   }}
@@ -857,7 +869,7 @@ export default function AdminModal({
           }}>
             {/* Left Navigation Rail */}
             <div style={{
-              width: '64px',
+              width: isMobile ? '50px' : '64px',
               flexShrink: 0,
               background: isDark ? '#141414' : '#f5f5f5',
               borderRight: `1px solid ${border}`,
@@ -865,7 +877,7 @@ export default function AdminModal({
               flexDirection: 'column',
               justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '12px 6px',
+              padding: isMobile ? '8px 4px' : '12px 6px',
               userSelect: 'none',
               zIndex: 2,
             }}>
@@ -891,8 +903,8 @@ export default function AdminModal({
                       }}
                       title={tab.title}
                       style={{
-                        width: '52px',
-                        height: '52px',
+                        width: isMobile ? '42px' : '52px',
+                        height: isMobile ? '44px' : '52px',
                         borderRadius: '10px',
                         border: `1px solid ${isActive ? '#00BCD4' : 'transparent'}`,
                         background: isActive

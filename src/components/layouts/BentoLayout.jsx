@@ -167,12 +167,13 @@ function BentoCard({ item, isDark, pingStatus }) {
       rel="noopener noreferrer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      className={`bento-card ${item.featured ? 'sm:col-span-2 col-span-1' : 'col-span-1'}`}
       style={{
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        padding: '20px',
+        padding: '16px',
         borderRadius: '16px',
         background: cardBg,
         border: `1px solid ${borderColor}`,
@@ -182,8 +183,7 @@ function BentoCard({ item, isDark, pingStatus }) {
         textDecoration: 'none',
         color: 'inherit',
         overflow: 'hidden',
-        minHeight: item.featured ? '175px' : '150px',
-        gridColumn: item.featured ? 'span 2' : 'span 1',
+        minHeight: item.featured ? '170px' : '145px',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
       }}
@@ -509,39 +509,43 @@ export default function BentoLayout({ links = [], isDark = true }) {
   }, [filteredLinks, pingResults]);
 
   return (
-    <div style={{
-      flex: 1,
-      display: 'flex',
-      flexDirection: 'column',
-      overflowY: 'auto',
-      padding: '16px 24px',
-      gap: '20px',
-      width: '100%',
-      maxWidth: '1400px',
-      margin: '0 auto',
-      boxSizing: 'border-box',
-    }}>
-      {/* Controls & Filter Bar */}
-      <div style={{
+    <div 
+      className="p-3 sm:p-6"
+      style={{
+        flex: 1,
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '12px',
-        padding: '12px 18px',
-        borderRadius: '16px',
-        background: isDark ? 'rgba(17, 20, 31, 0.7)' : 'rgba(255, 255, 255, 0.75)',
-        border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'}`,
-        backdropFilter: 'blur(16px)',
-        boxShadow: isDark ? '0 8px 30px rgba(0, 0, 0, 0.3)' : '0 2px 10px rgba(0, 0, 0, 0.03)',
-      }}>
+        flexDirection: 'column',
+        overflowY: 'auto',
+        gap: '16px',
+        width: '100%',
+        maxWidth: '1400px',
+        margin: '0 auto',
+        boxSizing: 'border-box',
+      }}
+    >
+      {/* Controls & Filter Bar */}
+      <div 
+        className="p-3 sm:p-4"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          borderRadius: '16px',
+          background: isDark ? 'rgba(17, 20, 31, 0.7)' : 'rgba(255, 255, 255, 0.75)',
+          border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'}`,
+          backdropFilter: 'blur(16px)',
+          boxShadow: isDark ? '0 8px 30px rgba(0, 0, 0, 0.3)' : '0 2px 10px rgba(0, 0, 0, 0.03)',
+        }}
+      >
         {/* Search Box */}
         <div style={{
           position: 'relative',
           display: 'flex',
           alignItems: 'center',
-          minWidth: '240px',
-          flex: '1 1 280px',
+          minWidth: 0,
+          flex: '1 1 220px',
         }}>
           <Search
             size={16}
@@ -662,8 +666,8 @@ export default function BentoLayout({ links = [], isDark = true }) {
       {filteredLinks.length > 0 ? (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: '16px',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
+          gap: '14px',
           alignItems: 'stretch',
         }}>
           {filteredLinks.map((item) => (

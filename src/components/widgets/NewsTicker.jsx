@@ -203,7 +203,7 @@ function NewsTicker({
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(15, 23, 42, 0.95)' : '#ffffff'}
         >
           <span style={{ fontSize: '13px' }}>{activeOption.icon}</span>
-          <span>{activeOption.label}</span>
+          <span className="hidden sm:inline">{activeOption.label}</span>
           <ChevronDown size={11} style={{ opacity: 0.6, transform: showSourcePicker ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
         </button>
 

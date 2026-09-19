@@ -32,9 +32,14 @@ export function calculateOptimalGrid(numPieces, isMobile) {
   // Filter candidates based on viewport constraints
   let candidates = pairs;
   if (isMobile) {
-    // For mobile, prefer cols <= 6 if possible
-    const mobileFiltered = pairs.filter(p => p.cols <= 6 && p.cols >= 3);
-    if (mobileFiltered.length > 0) candidates = mobileFiltered;
+    // For mobile, prefer cols between 2 and 4 so cells are wide enough for labels/icons
+    const narrowMobile = pairs.filter(p => p.cols <= 4 && p.cols >= 2);
+    if (narrowMobile.length > 0) {
+      candidates = narrowMobile;
+    } else {
+      const mobileFiltered = pairs.filter(p => p.cols <= 6 && p.cols >= 2);
+      if (mobileFiltered.length > 0) candidates = mobileFiltered;
+    }
   } else {
     // For desktop, prefer cols >= 6 and rows >= 3 if possible
     const desktopFiltered = pairs.filter(p => p.cols >= 6 && p.rows >= 3);

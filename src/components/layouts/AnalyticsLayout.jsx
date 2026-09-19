@@ -476,10 +476,21 @@ export default function AnalyticsLayout({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('all');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'sections' | 'table'
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 768px)').matches : false));
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => (typeof window !== 'undefined' ? window.innerWidth <= 768 : false));
   const [gridColumns, setGridColumns] = useState('auto'); // 'auto' | '4' | '6'
   const [pingResults, setPingResults] = useState({});
   const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.matchMedia ? window.matchMedia('(max-width: 768px)').matches : window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (mobile) setIsSidebarCollapsed(true);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Dynamic semantic color tokens for Dark vs Light mode
   const theme = useMemo(() => ({
@@ -650,16 +661,48 @@ export default function AnalyticsLayout({
         display: 'flex',
         width: '100%',
         height: '100vh',
+        maxHeight: '100dvh',
         background: theme.bg,
         color: theme.textPrimary,
         overflow: 'hidden',
         fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif",
         transition: 'background-color 0.25s ease, color 0.25s ease',
+        position: 'relative',
       }}
     >
+      {/* Mobile Backdrop Overlay */}
+      {isMobile && !isSidebarCollapsed && (
+        <div
+          onClick={() => setIsSidebarCollapsed(true)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 998,
+          }}
+        />
+      )}
+
       {/* Left Slim Sidebar Navigation Rail */}
       <aside
-        style={{
+        style={isMobile ? {
+          position: 'fixed',
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: '240px',
+          zIndex: 999,
+          display: isSidebarCollapsed ? 'none' : 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          borderRight: `1px solid ${theme.border}`,
+          background: theme.sidebarBg,
+          padding: '16px 12px',
+          boxSizing: 'border-box',
+          boxShadow: '4px 0 24px rgba(0,0,0,0.5)',
+          transition: 'all 0.25s ease',
+        } : {
           width: `${sidebarWidth}px`,
           minWidth: `${sidebarWidth}px`,
           height: '100%',
@@ -955,7 +998,7 @@ export default function AnalyticsLayout({
           flex: 1,
           height: '100%',
           overflowY: 'auto',
-          padding: '12px 18px 8px 18px',
+          padding: isMobile ? '10px 12px 8px 12px' : '12px 18px 8px 18px',
           boxSizing: 'border-box',
           display: 'flex',
           flexDirection: 'column',
@@ -974,42 +1017,66 @@ export default function AnalyticsLayout({
             flexShrink: 0,
           }}
         >
-          <div>
-            <h1
-              style={{
-                fontSize: '17px',
-                fontWeight: '800',
-                color: theme.textPrimary,
-                letterSpacing: '-0.3px',
-                margin: '0 0 2px 0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <span>Homelab Services & Controls</span>
-              <span
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {isMobile && (
+              <button
+                type="button"
+                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
                 style={{
-                  fontSize: '10px',
-                  fontWeight: '700',
-                  padding: '2px 6px',
-                  borderRadius: '5px',
-                  background: 'rgba(16, 185, 129, 0.15)',
-                  color: isDark ? '#34d399' : '#059669',
-                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  background: 'transparent',
+                  border: `1px solid ${theme.border}`,
+                  color: theme.textPrimary,
+                  borderRadius: '8px',
+                  padding: '6px 8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Toggle Navigation Menu"
+                aria-label="Toggle Navigation Menu"
+              >
+                <PanelLeftOpen size={16} />
+              </button>
+            )}
+            <div>
+              <h1
+                style={{
+                  fontSize: '17px',
+                  fontWeight: '800',
+                  color: theme.textPrimary,
+                  letterSpacing: '-0.3px',
+                  margin: '0 0 2px 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  flexWrap: 'wrap',
                 }}
               >
-                {onlineRate}% Operational
-              </span>
-            </h1>
-            <p style={{ fontSize: '11.5px', color: theme.textSecondary, margin: 0 }}>
-              Centralized launcher and operational controls for all your self-hosted services.
-            </p>
+                <span>Homelab Services & Controls</span>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: '700',
+                    padding: '2px 6px',
+                    borderRadius: '5px',
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    color: isDark ? '#34d399' : '#059669',
+                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                  }}
+                >
+                  {onlineRate}% Operational
+                </span>
+              </h1>
+              <p style={{ fontSize: '11.5px', color: theme.textSecondary, margin: 0 }}>
+                Centralized launcher and operational controls for all your self-hosted services.
+              </p>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
             {/* Real-time Search Box */}
-            <div style={{ position: 'relative', width: '230px' }}>
+            <div style={{ position: 'relative', width: isMobile ? '100%' : '230px', flex: isMobile ? '1 1 100%' : 'none' }}>
               <Search
                 size={14}
                 style={{
@@ -1140,7 +1207,7 @@ export default function AnalyticsLayout({
         <section
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
             gap: '10px',
             flexShrink: 0,
           }}
@@ -1413,7 +1480,7 @@ export default function AnalyticsLayout({
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
                       gap: '14px',
                     }}
                   >
@@ -1465,7 +1532,7 @@ export default function AnalyticsLayout({
                       }`}
                       style={
                         regularServices.length <= 3
-                          ? { gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 340px))' }
+                          ? { gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 340px))' }
                           : undefined
                       }
                     >
@@ -1505,7 +1572,7 @@ export default function AnalyticsLayout({
                         {groupItems.length}
                       </span>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 180px), 1fr))', gap: '10px' }}>
                       {groupItems.map((item) => (
                         <ServiceCard
                           key={item.id || item.link}

@@ -219,6 +219,13 @@ export default function TerminalLayout({
   const [cmdHistory, setCmdHistory] = useState([]);
   const [cmdHistIdx, setCmdHistIdx] = useState(-1);
   const [activeFilter, setActiveFilter] = useState('');
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 768px)').matches : false));
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.matchMedia ? window.matchMedia('(max-width: 768px)').matches : window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const inputRef = useRef(null);
   const terminalEndRef = useRef(null);
@@ -695,7 +702,7 @@ STATUS      : 200 DAEMONS HEALTHY`
 
   // Dimensions
   const containerMaxWidth = widthMode === 'full' ? '100%' : (widthMode === 'wide' ? '1560px' : '1280px');
-  const containerPadding = widthMode === 'full' ? '6px 8px' : '16px 20px';
+  const containerPadding = widthMode === 'full' ? '4px 6px' : (isMobile ? '6px 6px' : '16px 20px');
 
   // Responsive column template
   const gridColumns = showExec
@@ -775,8 +782,9 @@ STATUS      : 200 DAEMONS HEALTHY`
           overflow: 'hidden',
           position: 'relative',
           resize: widthMode === 'full' ? 'none' : 'both',
-          minWidth: '480px',
-          minHeight: '360px',
+          minWidth: 0,
+          width: '100%',
+          minHeight: isMobile ? '280px' : '360px',
           transition: 'background 0.2s ease, border-color 0.2s ease',
         }}
       >
@@ -815,7 +823,7 @@ STATUS      : 200 DAEMONS HEALTHY`
           }}
         >
           {/* Traffic Lights / Shell Prompt Status */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
             <div
               onClick={(e) => {
                 e.stopPropagation();
@@ -823,7 +831,7 @@ STATUS      : 200 DAEMONS HEALTHY`
                 setActiveFilter('');
                 setInputVal('');
               }}
-              style={{ width: '11px', height: '11px', borderRadius: '50%', background: '#ff5f56', cursor: 'pointer' }}
+              style={{ width: '11px', height: '11px', borderRadius: '50%', background: '#ff5f56', cursor: 'pointer', flexShrink: 0 }}
               title="Clear terminal buffer & reset search filter"
             />
             <div
@@ -831,7 +839,7 @@ STATUS      : 200 DAEMONS HEALTHY`
                 e.stopPropagation();
                 cycleFontSize();
               }}
-              style={{ width: '11px', height: '11px', borderRadius: '50%', background: '#ffbd2e', cursor: 'pointer' }}
+              style={{ width: '11px', height: '11px', borderRadius: '50%', background: '#ffbd2e', cursor: 'pointer', flexShrink: 0 }}
               title={`Cycle font size / density (Current: ${fontSize})`}
             />
             <div
@@ -839,7 +847,7 @@ STATUS      : 200 DAEMONS HEALTHY`
                 e.stopPropagation();
                 toggleFullscreen();
               }}
-              style={{ width: '11px', height: '11px', borderRadius: '50%', background: '#27c93f', cursor: 'pointer' }}
+              style={{ width: '11px', height: '11px', borderRadius: '50%', background: '#27c93f', cursor: 'pointer', flexShrink: 0 }}
               title={`Toggle Fullscreen / Boxed (Current: ${widthMode})`}
             />
             <span style={{
@@ -847,15 +855,19 @@ STATUS      : 200 DAEMONS HEALTHY`
               color: activeTheme.textPrimary,
               fontWeight: '600',
               letterSpacing: '0.4px',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: isMobile ? '130px' : '300px',
             }}>
               {windowTitle}
             </span>
           </div>
 
           {/* Right Status Badges & Quick Adjust Toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', flexShrink: 0 }}>
             <span style={{
-              display: 'inline-flex',
+              display: isMobile ? 'none' : 'inline-flex',
               alignItems: 'center',
               gap: '6px',
               fontWeight: '600',
@@ -864,7 +876,7 @@ STATUS      : 200 DAEMONS HEALTHY`
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: activeTheme.success }} />
               200 OK
             </span>
-            <span style={{ color: activeTheme.textSecondary, fontWeight: '500' }}>
+            <span style={{ display: isMobile ? 'none' : 'inline', color: activeTheme.textSecondary, fontWeight: '500' }}>
               UPTIME: 99.9%
             </span>
 
@@ -1181,7 +1193,7 @@ STATUS      : 200 DAEMONS HEALTHY`
               style={{
                 margin: 0,
                 color: activeTheme.bannerColor || activeTheme.primary,
-                fontSize: fontSize === '14px' ? '11px' : (fontSize === '11px' ? '9.5px' : '10.5px'),
+                fontSize: isMobile ? 'clamp(6px, 1.6vw, 9px)' : (fontSize === '14px' ? '11px' : (fontSize === '11px' ? '9.5px' : '10.5px')),
                 lineHeight: '1.15',
                 fontWeight: 'bold',
                 textShadow: (bannerGlow && activeTheme.glow !== 'none') ? activeTheme.glow : 'none',
@@ -1211,17 +1223,22 @@ STATUS      : 200 DAEMONS HEALTHY`
           </div>
 
           {/* Table Container */}
-          <div style={{
-            marginTop: '8px',
-            border: `1px solid ${activeTheme.tableBorder}`,
-            borderRadius: '4px',
-            overflow: 'hidden',
-          }}>
-            {/* Table Column Headers */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: gridColumns,
+          <div 
+            className="responsive-scroll-x"
+            style={{
+              marginTop: '8px',
+              border: `1px solid ${activeTheme.tableBorder}`,
+              borderRadius: '4px',
+              overflowX: 'auto',
+              maxWidth: '100%',
+            }}
+          >
+            <div style={{ minWidth: isMobile ? '540px' : '100%' }}>
+              {/* Table Column Headers */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: gridColumns,
                 alignItems: 'center',
                 padding: density === 'compact' ? '5px 10px' : (density === 'spacious' ? '9px 14px' : '7px 12px'),
                 background: activeTheme.tableHeaderBg,
@@ -1384,6 +1401,7 @@ STATUS      : 200 DAEMONS HEALTHY`
                   );
                 })
               )}
+            </div>
             </div>
           </div>
 

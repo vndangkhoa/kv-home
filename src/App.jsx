@@ -172,7 +172,7 @@ function generateTiling(cols, rows, numPieces, rng) {
 function TetrisPiece({ piece, theme, isDark, fallIndex, allLanded }) {
   const [isHovered, setIsHovered] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 500px)').matches : false));
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 768px)').matches : false));
   const [resolvedVideoSrc, setResolvedVideoSrc] = useState(piece.videoUrl || (piece.label === 'cv' ? '/cv-video.mp4' : ''));
 
   const iconUrl = useMemo(() => getServiceIconUrl(piece), [piece]);
@@ -185,7 +185,7 @@ function TetrisPiece({ piece, theme, isDark, fallIndex, allLanded }) {
   const shape = useMemo(() => getTetrominoShape(piece.cells), [piece.cells]);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.matchMedia ? window.matchMedia('(max-width: 500px)').matches : window.innerWidth <= 500);
+    const handleResize = () => setIsMobile(window.matchMedia ? window.matchMedia('(max-width: 768px)').matches : window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -309,7 +309,7 @@ function TetrisPiece({ piece, theme, isDark, fallIndex, allLanded }) {
       )}
       <span
         style={{
-          fontSize: 'clamp(6px, 1.2vw, 11px)',
+          fontSize: isMobile ? 'clamp(8px, 2.2vw, 11px)' : 'clamp(7px, 1.2vw, 11px)',
           fontWeight: '500',
           textTransform: 'lowercase',
           color: '#fff',
@@ -511,7 +511,7 @@ function App() {
   const [seed, setSeed] = useState(() => Math.random());
   const [landedSeed, setLandedSeed] = useState(() => null);
   const allLanded = landedSeed === seed;
-  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 600px)').matches : false));
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(max-width: 768px)').matches : false));
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isSplitView, setIsSplitView] = useState(() => {
     return typeof window !== 'undefined' ? (window.matchMedia ? window.matchMedia('(min-width: 901px)').matches : true) : true;
@@ -618,7 +618,7 @@ function App() {
 
   // Window resize handler
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.matchMedia ? window.matchMedia('(max-width: 600px)').matches : window.innerWidth <= 600);
+    const handleResize = () => setIsMobile(window.matchMedia ? window.matchMedia('(max-width: 768px)').matches : window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -840,13 +840,14 @@ function App() {
       {/* Live Dashboard Area */}
       <div style={{
         flex: 1,
-        width: showSplit ? 'calc(100vw - min(500px, 45vw))' : '100vw',
+        width: showSplit ? 'calc(100vw - min(500px, 45vw))' : '100%',
         height: '100vh',
+        maxHeight: '100dvh',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
         boxSizing: 'border-box',
-        padding: (activeLayoutId === 'dock' || activeLayoutId === 'kinetic') ? '0' : '0 10px',
+        padding: (activeLayoutId === 'dock' || activeLayoutId === 'kinetic') ? '0' : (isMobile ? '0 4px' : '0 10px'),
         transition: 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
         minWidth: 0,
       }}>
@@ -855,7 +856,7 @@ function App() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '8px 16px',
+          padding: isMobile ? '8px 12px' : '8px 16px',
           background: headerBg,
           flexWrap: 'wrap',
           gap: '8px',
@@ -863,8 +864,8 @@ function App() {
           borderBottom: `1px solid ${borderColor}`,
           fontFamily: 'var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '600', color: textColor, textDecoration: 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+            <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '600', color: textColor, textDecoration: 'none', whiteSpace: 'nowrap' }}>
               {settings.logoUrl && (
                 <img
                   src={settings.logoUrl}
@@ -883,7 +884,7 @@ function App() {
               <span>{settings.title || 'Khoa.vo'}</span>
             </a>
             {settings.tagline && (
-              <span style={{ fontSize: '11px', color: currentTheme.subTextColor || (isDark ? '#888' : '#64748b') }} className="header-tagline">
+              <span style={{ fontSize: '11px', color: currentTheme.subTextColor || (isDark ? '#888' : '#64748b') }} className="header-tagline hidden sm:inline truncate max-w-[200px]">
                 {settings.tagline}
               </span>
             )}
@@ -891,15 +892,19 @@ function App() {
 
           {/* Quick Segmented Layout Switcher (Hidden in header by default; managed in Settings / Admin modal) */}
           {settings.showLayoutSwitcherInHeader && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              background: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
-              borderRadius: '9px',
-              padding: '3px',
-              border: `1px solid ${borderColor}`,
-              gap: '2px',
-            }}>
+            <div 
+              className="responsive-scroll-x no-scrollbar"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                background: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
+                borderRadius: '9px',
+                padding: '3px',
+                border: `1px solid ${borderColor}`,
+                gap: '2px',
+                maxWidth: '100%',
+              }}
+            >
               {[
                 { id: 'bento', label: 'Bento', icon: '⊞' },
                 { id: 'tetris', label: 'Tetris', icon: '🕹️' },
@@ -918,7 +923,7 @@ function App() {
                       color: isActive ? textColor : (isDark ? '#888' : '#666'),
                       border: 'none',
                       borderRadius: '7px',
-                      padding: '4px 9px',
+                      padding: isMobile ? '4px 7px' : '4px 9px',
                       fontSize: '11px',
                       fontFamily: 'inherit',
                       cursor: 'pointer',
@@ -928,11 +933,12 @@ function App() {
                       fontWeight: isActive ? '600' : '400',
                       boxShadow: isActive ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
                       transition: 'all 0.15s ease',
+                      flexShrink: 0,
                     }}
                     title={`Switch to ${l.label} Layout`}
                   >
-                    <span style={{ fontSize: '11px' }}>{l.icon}</span>
-                    <span>{l.label}</span>
+                    <span style={{ fontSize: '12px' }}>{l.icon}</span>
+                    <span className="hidden sm:inline">{l.label}</span>
                   </button>
                 );
               })}

@@ -789,7 +789,7 @@ export default function NouveauLayout({ links = [], isDark = true, settings = {}
 
   return (
     <div
-      className="nouveau-layout-container"
+      className="nouveau-layout-container p-3 sm:p-6 pb-20 sm:pb-24"
       style={{
         flex: 1,
         minHeight: 0,
@@ -798,7 +798,6 @@ export default function NouveauLayout({ links = [], isDark = true, settings = {}
         overflowX: 'hidden',
         background: pageBg,
         color: textColor,
-        padding: '36px 24px 70px 24px',
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
@@ -838,45 +837,22 @@ export default function NouveauLayout({ links = [], isDark = true, settings = {}
           left: '8%',
           color: goldColor,
           fontSize: '12px',
+          opacity: 0.6,
           animation: 'stardust-pulse 4s ease-in-out infinite',
           pointerEvents: 'none',
         }}
       >
         ✦
       </div>
+
       <div
         style={{
           position: 'absolute',
-          top: '80px',
-          right: '9%',
+          top: '40px',
+          right: '10%',
           color: goldColor,
           fontSize: '14px',
-          animation: 'stardust-pulse 5s ease-in-out 1.5s infinite',
-          pointerEvents: 'none',
-        }}
-      >
-        ✧
-      </div>
-      <div
-        style={{
-          position: 'absolute',
-          top: '160px',
-          left: '14%',
-          color: goldColor,
-          fontSize: '10px',
-          animation: 'stardust-pulse 6s ease-in-out 3s infinite',
-          pointerEvents: 'none',
-        }}
-      >
-        ⋆
-      </div>
-      <div
-        style={{
-          position: 'absolute',
-          top: '240px',
-          right: '15%',
-          color: goldColor,
-          fontSize: '11px',
+          opacity: 0.5,
           animation: 'stardust-pulse 4.5s ease-in-out 2s infinite',
           pointerEvents: 'none',
         }}
@@ -888,14 +864,14 @@ export default function NouveauLayout({ links = [], isDark = true, settings = {}
         {/* Celestial Universe Header */}
         <div style={{ textAlign: 'center', marginBottom: '34px' }}>
           {/* Header Subtitle with Moons and Stars */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '10px', maxWidth: '100%', flexWrap: 'wrap', justifyContent: 'center' }}>
             <span style={{ color: goldColor, fontSize: '13px' }}>☽</span>
             <span
               style={{
                 fontFamily: '"Cormorant Garamond", serif',
                 fontStyle: 'italic',
-                fontSize: '13px',
-                letterSpacing: '0.22em',
+                fontSize: 'clamp(10px, 2.6vw, 13px)',
+                letterSpacing: 'clamp(0.08em, 1.5vw, 0.22em)',
                 color: goldColor,
                 textTransform: 'uppercase',
               }}
@@ -1084,8 +1060,8 @@ export default function NouveauLayout({ links = [], isDark = true, settings = {}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(285px, 1fr))',
-              gap: '24px',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
+              gap: '18px',
             }}
           >
             {filteredLinks.map((item, index) => {

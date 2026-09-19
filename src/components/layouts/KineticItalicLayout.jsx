@@ -336,7 +336,7 @@ function KineticStripRow({ item, index, isDark, pingStatus, accentColor }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '16px 20px',
+        padding: '12px 14px',
         textDecoration: 'none',
         position: 'relative',
         color: isHovered ? '#000000' : (isDark ? '#FFFFFF' : '#111113'),
@@ -361,16 +361,16 @@ function KineticStripRow({ item, index, isDark, pingStatus, accentColor }) {
       />
 
       {/* Left: Index + Icon + Kinetic Title + Telemetry Subtitle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '18px', zIndex: 1, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1, minWidth: 0 }}>
         {/* Slanted Index Number with bracket snap */}
         <span
           style={{
             fontFamily: '"Space Mono", monospace',
-            fontSize: '13px',
+            fontSize: '12px',
             fontWeight: '700',
             fontStyle: 'italic',
             opacity: isHovered ? 1 : 0.45,
-            width: '36px',
+            width: '30px',
             flexShrink: 0,
             transition: 'all 0.18s ease',
             letterSpacing: isHovered ? '0.04em' : '0em',
@@ -382,7 +382,7 @@ function KineticStripRow({ item, index, isDark, pingStatus, accentColor }) {
         <KineticServiceIcon item={item} isDark={isDark} isHovered={isHovered} accentColor={accentColor} />
 
         {/* Slanted Title with Decryption & Subtitle Tape */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '16px', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', minWidth: 0 }}>
           <KineticTitle
             text={item.title || item.label}
             isHovered={isHovered}
@@ -400,9 +400,10 @@ function KineticStripRow({ item, index, isDark, pingStatus, accentColor }) {
       </div>
 
       {/* Right: Tag Pill + Latency Dot + Angled Action Arrow */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', zIndex: 1, flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', zIndex: 1, flexShrink: 0 }}>
         {item.group && (
           <span
+            className="hidden sm:inline-block"
             style={{
               fontFamily: '"Space Mono", monospace',
               fontSize: '10px',
@@ -796,11 +797,11 @@ export default function KineticItalicLayout({ links = [], isDark = true, setting
       <KineticTicker linksCount={links.length} isDark={isDark} accentColor={accentColor} />
 
       <div
+        className="p-3 sm:p-6 pb-20 sm:pb-24"
         style={{
           width: '100%',
           maxWidth: '1240px',
           margin: '0 auto',
-          padding: '36px 24px 80px 24px',
           boxSizing: 'border-box',
           position: 'relative',
         }}
@@ -859,12 +860,12 @@ export default function KineticItalicLayout({ links = [], isDark = true, setting
             <h1
               style={{
                 fontFamily: '"Syne", sans-serif',
-                fontSize: 'clamp(42px, 8vw, 84px)',
+                fontSize: 'clamp(30px, 7.5vw, 84px)',
                 fontWeight: '900',
                 fontStyle: 'italic',
                 letterSpacing: '-0.055em',
                 textTransform: 'uppercase',
-                lineHeight: '0.86',
+                lineHeight: '0.9',
                 margin: 0,
               }}
             >
@@ -1088,8 +1089,8 @@ export default function KineticItalicLayout({ links = [], isDark = true, setting
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: '16px',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 270px), 1fr))',
+              gap: '14px',
             }}
           >
             {filteredLinks.map((item, index) => {

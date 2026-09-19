@@ -212,10 +212,7 @@ export const ICON_MAP = {
 
   // Utilities & Document Tools
   pdf: 'stirling-pdf',
-  stirling: 'stirling-pdf',
-  'stirling-pdf': 'stirling-pdf',
   tools: 'it-tools',
-  'it-tools': 'it-tools',
   it: 'it-tools',
 };
 
