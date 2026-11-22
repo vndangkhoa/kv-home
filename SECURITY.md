@@ -17,10 +17,13 @@ This document outlines the multi-layered security protections built into **Khoa.
   5. Enter the 6-digit code displayed in your app to activate.
 - **Enforcement**: Once enabled, logging into the admin portal requires both your password and a valid 6-digit one-time code.
 
-### 🛡️ Password Cryptography
+### 🛡️ Admin Authentication & Password Cryptography
+- **Username + Password Login**: Administrator access requires both username and password (defaults to **`admin` / `admin`** on fresh deployments).
+- **First-Boot Environment Overrides**: Set `ADMIN_USER` and `ADMIN_PASSWORD` before first boot to provision custom initial credentials automatically in `data/auth.json`.
+- **Default-Credential Warning**: The Security tab and navigation badge highlight an active amber warning whenever default `admin / admin` credentials remain in use.
 - Passwords are encrypted using Node's native `crypto.scryptSync` with unique 16-byte cryptographic salts.
-- Constant-time comparison (`crypto.timingSafeEqual`) prevents side-channel timing attacks.
-- Legacy plaintext passwords in `data/auth.json` are automatically upgraded on server boot.
+- Constant-time comparison (`crypto.timingSafeEqual`) protects both username and password verification against side-channel timing attacks.
+- Legacy plaintext passwords or pre-username `data/auth.json` files are automatically upgraded/migrated on server boot while preserving existing passwords and TOTP secrets.
 
 ### 🔑 Session Tokens (HMAC-SHA256)
 - Authenticated sessions receive a signed token (`<nonce>:<expiresAt>:<signature>`) valid for 24 hours.

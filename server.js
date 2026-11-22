@@ -22,6 +22,8 @@ const settingsFile = path.resolve(dataDir, 'settings.json');
 const authFile = path.resolve(dataDir, 'auth.json');
 const sessionSecretFile = path.resolve(dataDir, '.session_secret');
 const initialSettingsFile = path.resolve(__dirname, 'src/data/settings.json');
+const DEFAULT_ADMIN_USER = (process.env.ADMIN_USER || 'admin').trim() || 'admin';
+const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 
 const DEFAULT_SETTINGS = {
   title: 'Khoa.vo',
@@ -124,6 +126,23 @@ function verifyPassword(password, hash, salt, authObj) {
   }
 }
 
+function verifyUsername(inputUsername, storedUsername) {
+  const expected = (storedUsername || DEFAULT_ADMIN_USER).trim().toLowerCase();
+  const provided = typeof inputUsername === 'string' ? inputUsername.trim().toLowerCase() : '';
+  if (!provided) return false;
+  const a = crypto.createHash('sha256').update(expected).digest();
+  const b = crypto.createHash('sha256').update(provided).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
+function isUsingDefaultCredentials(auth) {
+  if (!auth) return false;
+  return (
+    verifyUsername('admin', auth.username) &&
+    verifyPassword('admin', auth.passwordHash, auth.salt, auth)
+  );
+}
+
 // Seed & migrate initial data files
 const initialLinksFile = path.resolve(__dirname, 'src/data/links.json');
 if (!fs.existsSync(linksFile)) {
@@ -147,13 +166,14 @@ if (!fs.existsSync(settingsFile)) {
 const initialAuthFile = path.resolve(__dirname, 'src/data/auth.json');
 function ensureAuthFile() {
   let authData = null;
-  if (fs.existsSync(authFile)) {
+  const hasAuthFile = fs.existsSync(authFile);
+  if (hasAuthFile) {
     try {
       authData = JSON.parse(fs.readFileSync(authFile, 'utf-8'));
     } catch (e) {
       console.error('[Server] Failed to parse auth.json:', e);
     }
-  } else if (fs.existsSync(initialAuthFile)) {
+  } else if (!(process.env.ADMIN_USER || process.env.ADMIN_PASSWORD) && fs.existsSync(initialAuthFile)) {
     try {
       authData = JSON.parse(fs.readFileSync(initialAuthFile, 'utf-8'));
     } catch {
@@ -161,19 +181,38 @@ function ensureAuthFile() {
     }
   }
 
-  // Handle migration from legacy plaintext password
-  if (!authData || !authData.passwordHash) {
-    const plain = authData?.password || 'thieugia';
+  // Handle initialization or migration from legacy plaintext password
+  if (!authData || !authData.passwordHash || !authData.salt) {
+    const plain = authData?.password || DEFAULT_ADMIN_PASSWORD;
+    const username = (typeof authData?.username === 'string' && authData.username.trim())
+      ? authData.username.trim()
+      : DEFAULT_ADMIN_USER;
     const { hash, salt } = hashPassword(plain);
     authData = {
+      username,
       passwordHash: hash,
       salt,
-      totpEnabled: false,
-      totpSecret: null,
+      totpEnabled: Boolean(authData?.totpEnabled),
+      totpSecret: authData?.totpSecret || null,
       updatedAt: new Date().toISOString()
     };
     fs.writeFileSync(authFile, JSON.stringify(authData, null, 2), 'utf-8');
-    console.log('[Server] Upgraded auth.json with salted cryptographic scrypt hash');
+    console.log('[Server] Initialized/upgraded auth.json with salted cryptographic scrypt hash');
+  } else {
+    let needsWrite = !hasAuthFile;
+    if (!authData.username || typeof authData.username !== 'string' || !authData.username.trim()) {
+      authData.username = DEFAULT_ADMIN_USER;
+      authData.updatedAt = new Date().toISOString();
+      needsWrite = true;
+    }
+    if (authData.password) {
+      delete authData.password;
+      needsWrite = true;
+    }
+    if (needsWrite) {
+      fs.writeFileSync(authFile, JSON.stringify(authData, null, 2), 'utf-8');
+      console.log('[Server] Migrated auth.json with administrator username');
+    }
   }
   return authData;
 }
@@ -233,7 +272,7 @@ function readAuth() {
   try {
     if (fs.existsSync(authFile)) {
       const data = JSON.parse(fs.readFileSync(authFile, 'utf-8'));
-      if (data.passwordHash && data.salt) return data;
+      if (data.passwordHash && data.salt && data.username) return data;
     }
   } catch (err) {
     console.error('[Server] Error reading auth.json:', err);
@@ -1422,10 +1461,14 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, {
       twoFactorEnabled: !!auth.totpEnabled,
       authenticated: isAuthenticated,
+      ...(isAuthenticated ? {
+        username: auth.username || DEFAULT_ADMIN_USER,
+        isDefaultCredentials: isUsingDefaultCredentials(auth),
+      } : {}),
     });
   }
 
-  // 5. POST /api/auth/verify (Password + 2FA Login with Rate Limiting)
+  // 5. POST /api/auth/verify (Username + Password + 2FA Login with Rate Limiting)
   if (pathname === '/api/auth/verify' && req.method === 'POST') {
     const limitStatus = checkRateLimit(clientIp);
     if (limitStatus.locked) {
@@ -1436,20 +1479,21 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const body = await readBody(req, 1024 * 64);
-      const { password, otp } = JSON.parse(body);
+      const { username, password, otp } = JSON.parse(body);
       const auth = readAuth();
 
-      // Check password first
+      // Always verify both username and password to avoid timing oracles
+      const usernameMatch = verifyUsername(username, auth.username);
       const passwordMatch = verifyPassword(password, auth.passwordHash, auth.salt, auth);
-      if (!passwordMatch) {
+      if (!usernameMatch || !passwordMatch) {
         recordLoginFailure(clientIp);
-        return sendJson(res, 401, { error: 'Invalid password' });
+        return sendJson(res, 401, { error: 'Invalid username or password' });
       }
 
       // Check if 2FA is active
       if (auth.totpEnabled) {
         if (!otp) {
-          // Password passed, prompt client for 2FA OTP code
+          // Credentials passed, prompt client for 2FA OTP code
           return sendJson(res, 200, { twoFactorRequired: true });
         }
 
@@ -1467,14 +1511,16 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, {
         success: true,
         token,
+        username: auth.username || DEFAULT_ADMIN_USER,
         twoFactorEnabled: !!auth.totpEnabled,
+        isDefaultCredentials: isUsingDefaultCredentials(auth),
       });
     } catch (err) {
       return sendJson(res, 400, { error: 'Invalid request: ' + err.message });
     }
   }
 
-  // 6. POST /api/auth/password (Protected Password Update)
+  // 6. POST /api/auth/password (Protected Credentials Update)
   if (pathname === '/api/auth/password' && req.method === 'POST') {
     const token = getBearerToken(req);
     if (!verifySessionToken(token)) {
@@ -1483,10 +1529,7 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const body = await readBody(req, 1024 * 64);
-      const { currentPassword, newPassword } = JSON.parse(body);
-      if (!newPassword || newPassword.length < 4) {
-        return sendJson(res, 400, { error: 'New password must be at least 4 characters long' });
-      }
+      const { currentPassword, newUsername, newPassword } = JSON.parse(body);
 
       const auth = readAuth();
       const match = verifyPassword(currentPassword, auth.passwordHash, auth.salt, auth);
@@ -1494,14 +1537,41 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 401, { error: 'Current password incorrect' });
       }
 
-      const { hash, salt } = hashPassword(newPassword);
-      auth.passwordHash = hash;
-      auth.salt = salt;
+      const trimmedUsername = typeof newUsername === 'string' ? newUsername.trim() : '';
+      if (trimmedUsername && !/^[a-zA-Z0-9._-]{2,32}$/.test(trimmedUsername)) {
+        return sendJson(res, 400, { error: 'Username must be 2-32 characters (letters, numbers, ., _, -)' });
+      }
+
+      if (newPassword !== undefined && newPassword !== null && newPassword !== '') {
+        if (typeof newPassword !== 'string' || newPassword.length < 4) {
+          return sendJson(res, 400, { error: 'New password must be at least 4 characters long' });
+        }
+      }
+
+      const currentUser = auth.username || DEFAULT_ADMIN_USER;
+      const usernameChanged = Boolean(trimmedUsername && trimmedUsername !== currentUser);
+      const hasNewPassword = Boolean(newPassword && typeof newPassword === 'string');
+
+      if (!usernameChanged && !hasNewPassword) {
+        return sendJson(res, 400, { error: 'Provide a new username or a new password (min. 4 characters)' });
+      }
+
+      auth.username = trimmedUsername || currentUser;
+      if (hasNewPassword) {
+        const { hash, salt } = hashPassword(newPassword);
+        auth.passwordHash = hash;
+        auth.salt = salt;
+      }
+      delete auth.password;
       auth.updatedAt = new Date().toISOString();
       writeAuth(auth);
 
-      console.log('[Security] Admin password updated successfully.');
-      return sendJson(res, 200, { success: true });
+      console.log('[Security] Admin credentials updated successfully.');
+      return sendJson(res, 200, {
+        success: true,
+        username: auth.username,
+        isDefaultCredentials: isUsingDefaultCredentials(auth),
+      });
     } catch (err) {
       return sendJson(res, 400, { error: 'Invalid request: ' + err.message });
     }
@@ -1514,8 +1584,10 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 401, { error: 'Unauthorized: Valid admin session token required' });
     }
 
+    const auth = readAuth();
     const secret = generateTOTPSecret();
-    const qrUri = `otpauth://totp/KhoaVoPortal:admin?secret=${secret}&issuer=KhoaVoPortal`;
+    const accountLabel = encodeURIComponent(auth.username || DEFAULT_ADMIN_USER);
+    const qrUri = `otpauth://totp/KVHome:${accountLabel}?secret=${secret}&issuer=KVHome`;
 
     return sendJson(res, 200, {
       success: true,

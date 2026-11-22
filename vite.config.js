@@ -22,6 +22,8 @@ function apiPlugin() {
   const uploadsDir = path.resolve(__dirname, 'uploads');
   const publicUploadsDir = path.resolve(__dirname, 'public/uploads');
   const sessionSecretFile = path.resolve(dataDir, '.session_secret');
+  const DEFAULT_ADMIN_USER = (process.env.ADMIN_USER || 'admin').trim() || 'admin';
+  const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
@@ -69,6 +71,23 @@ function apiPlugin() {
       }
     }
     return false;
+  }
+
+  function verifyUsername(inputUsername, storedUsername) {
+    const expected = (storedUsername || DEFAULT_ADMIN_USER).trim().toLowerCase();
+    const provided = typeof inputUsername === 'string' ? inputUsername.trim().toLowerCase() : '';
+    if (!provided) return false;
+    const a = crypto.createHash('sha256').update(expected).digest();
+    const b = crypto.createHash('sha256').update(provided).digest();
+    return crypto.timingSafeEqual(a, b);
+  }
+
+  function isUsingDefaultCredentials(auth) {
+    if (!auth) return false;
+    return (
+      verifyUsername('admin', auth.username) &&
+      verifyPassword('admin', auth)
+    );
   }
 
   const DEFAULT_SETTINGS = {
@@ -182,15 +201,17 @@ function apiPlugin() {
   const readAuth = () => {
     try {
       if (fs.existsSync(authPath)) {
-        return JSON.parse(fs.readFileSync(authPath, 'utf-8'));
+        const parsed = JSON.parse(fs.readFileSync(authPath, 'utf-8'));
+        return { ...parsed, username: (typeof parsed.username === 'string' && parsed.username.trim()) ? parsed.username.trim() : DEFAULT_ADMIN_USER };
       }
-      if (fs.existsSync(srcAuthPath)) {
-        return JSON.parse(fs.readFileSync(srcAuthPath, 'utf-8'));
+      if (!(process.env.ADMIN_USER || process.env.ADMIN_PASSWORD) && fs.existsSync(srcAuthPath)) {
+        const parsed = JSON.parse(fs.readFileSync(srcAuthPath, 'utf-8'));
+        return { ...parsed, username: (typeof parsed.username === 'string' && parsed.username.trim()) ? parsed.username.trim() : DEFAULT_ADMIN_USER };
       }
     } catch (e) {
       console.error('[Vite API] Error reading auth.json:', e);
     }
-    return { password: 'admin' };
+    return { username: DEFAULT_ADMIN_USER, password: DEFAULT_ADMIN_PASSWORD };
   };
 
   const writeAuth = (data) => {
@@ -740,20 +761,27 @@ function apiPlugin() {
     if (url === '/api/auth/status' && req.method === 'GET') {
       const auth = readAuth();
       const token = getBearerToken(req);
+      const isAuthenticated = verifySessionToken(token);
       return sendJson(res, 200, {
         twoFactorEnabled: !!auth.totpEnabled,
-        authenticated: verifySessionToken(token),
+        authenticated: isAuthenticated,
+        ...(isAuthenticated ? {
+          username: auth.username || DEFAULT_ADMIN_USER,
+          isDefaultCredentials: isUsingDefaultCredentials(auth),
+        } : {}),
       });
     }
 
     if (url === '/api/auth/verify' && req.method === 'POST') {
       try {
         const body = await readBody(req);
-        const { password, otp } = JSON.parse(body);
+        const { username, password, otp } = JSON.parse(body);
         const auth = readAuth();
 
-        if (!verifyPassword(password, auth)) {
-          return sendJson(res, 401, { error: 'Invalid password' });
+        const usernameMatch = verifyUsername(username, auth.username);
+        const passwordMatch = verifyPassword(password, auth);
+        if (!usernameMatch || !passwordMatch) {
+          return sendJson(res, 401, { error: 'Invalid username or password' });
         }
 
         if (auth.totpEnabled) {
@@ -767,7 +795,9 @@ function apiPlugin() {
         return sendJson(res, 200, {
           success: true,
           token,
+          username: auth.username || DEFAULT_ADMIN_USER,
           twoFactorEnabled: !!auth.totpEnabled,
+          isDefaultCredentials: isUsingDefaultCredentials(auth),
         });
       } catch (e) {
         return sendJson(res, 400, { error: 'Invalid request: ' + e.message });
@@ -782,22 +812,46 @@ function apiPlugin() {
 
       try {
         const body = await readBody(req);
-        const { currentPassword, newPassword } = JSON.parse(body);
-        if (!newPassword || newPassword.length < 4) {
-          return sendJson(res, 400, { error: 'New password must be at least 4 characters long' });
-        }
+        const { currentPassword, newUsername, newPassword } = JSON.parse(body);
         const auth = readAuth();
         if (!verifyPassword(currentPassword, auth)) {
           return sendJson(res, 401, { error: 'Current password incorrect' });
         }
 
-        const { hash, salt } = hashPassword(newPassword);
-        auth.passwordHash = hash;
-        auth.salt = salt;
+        const trimmedUsername = typeof newUsername === 'string' ? newUsername.trim() : '';
+        if (trimmedUsername && !/^[a-zA-Z0-9._-]{2,32}$/.test(trimmedUsername)) {
+          return sendJson(res, 400, { error: 'Username must be 2-32 characters (letters, numbers, ., _, -)' });
+        }
+
+        if (newPassword !== undefined && newPassword !== null && newPassword !== '') {
+          if (typeof newPassword !== 'string' || newPassword.length < 4) {
+            return sendJson(res, 400, { error: 'New password must be at least 4 characters long' });
+          }
+        }
+
+        const currentUser = auth.username || DEFAULT_ADMIN_USER;
+        const usernameChanged = Boolean(trimmedUsername && trimmedUsername !== currentUser);
+        const hasNewPassword = Boolean(newPassword && typeof newPassword === 'string');
+
+        if (!usernameChanged && !hasNewPassword) {
+          return sendJson(res, 400, { error: 'Provide a new username or a new password (min. 4 characters)' });
+        }
+
+        auth.username = trimmedUsername || currentUser;
+        if (hasNewPassword) {
+          const { hash, salt } = hashPassword(newPassword);
+          auth.passwordHash = hash;
+          auth.salt = salt;
+        }
         delete auth.password;
+        auth.updatedAt = new Date().toISOString();
         writeAuth(auth);
 
-        return sendJson(res, 200, { success: true });
+        return sendJson(res, 200, {
+          success: true,
+          username: auth.username,
+          isDefaultCredentials: isUsingDefaultCredentials(auth),
+        });
       } catch (e) {
         return sendJson(res, 400, { error: 'Invalid request: ' + e.message });
       }
@@ -808,8 +862,10 @@ function apiPlugin() {
       if (!verifySessionToken(token)) {
         return sendJson(res, 401, { error: 'Unauthorized: Valid admin token required' });
       }
+      const auth = readAuth();
       const secret = base32Encode(crypto.randomBytes(20));
-      const qrUri = `otpauth://totp/KhoaVoPortal:admin?secret=${secret}&issuer=KhoaVoPortal`;
+      const accountLabel = encodeURIComponent(auth.username || DEFAULT_ADMIN_USER);
+      const qrUri = `otpauth://totp/KVHome:${accountLabel}?secret=${secret}&issuer=KVHome`;
       return sendJson(res, 200, { success: true, secret, qrUri });
     }
 

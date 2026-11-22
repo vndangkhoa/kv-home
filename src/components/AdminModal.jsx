@@ -48,7 +48,10 @@ export default function AdminModal({
 }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [token, setToken] = useState(() => safeSessionStorage.getItem('kv_admin_token') || '');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [adminUsername, setAdminUsername] = useState('admin');
+  const [isDefaultCredentials, setIsDefaultCredentials] = useState(false);
   const [loginStep, setLoginStep] = useState('password'); // 'password' | 'otp'
   const [otpCode, setOtpCode] = useState('');
   const [authError, setAuthError] = useState('');
@@ -121,6 +124,8 @@ export default function AdminModal({
       setColorPickerOpenIdx(null);
       setShowUnsavedWarning(false);
       setLoginStep('password');
+      setUsername('');
+      setPassword('');
       setOtpCode('');
       setIsAuthenticated(false);
     }
@@ -140,8 +145,11 @@ export default function AdminModal({
               setIsAuthenticated(true);
               setToken(existingToken);
               setTwoFactorEnabled(!!data.twoFactorEnabled);
+              if (data.username) setAdminUsername(data.username);
+              setIsDefaultCredentials(!!data.isDefaultCredentials);
             } else {
               setIsAuthenticated(false);
+              setIsDefaultCredentials(false);
               safeSessionStorage.removeItem('kv_admin_token');
             }
           })
@@ -195,8 +203,14 @@ export default function AdminModal({
     e?.preventDefault();
     setAuthError('');
 
+    const trimmedUsername = username.trim();
+    if (loginStep === 'password' && (!trimmedUsername || !password)) {
+      setAuthError('Please enter both username and password.');
+      return;
+    }
+
     try {
-      const payload = { password };
+      const payload = { username: trimmedUsername, password };
       if (loginStep === 'otp') {
         payload.otp = otpCode.trim();
       }
@@ -215,7 +229,7 @@ export default function AdminModal({
       }
 
       if (!res.ok) {
-        setAuthError(data.error || 'Incorrect password.');
+        setAuthError(data.error || 'Invalid username or password.');
         return;
       }
 
@@ -230,6 +244,9 @@ export default function AdminModal({
         setToken(data.token);
         safeSessionStorage.setItem('kv_admin_token', data.token);
         setTwoFactorEnabled(!!data.twoFactorEnabled);
+        if (data.username) setAdminUsername(data.username);
+        setIsDefaultCredentials(!!data.isDefaultCredentials);
+        setUsername('');
         setPassword('');
         setOtpCode('');
         setLoginStep('password');
@@ -244,8 +261,10 @@ export default function AdminModal({
     setIsAuthenticated(false);
     setToken('');
     safeSessionStorage.removeItem('kv_admin_token');
+    setUsername('');
     setPassword('');
     setOtpCode('');
+    setIsDefaultCredentials(false);
     setLoginStep('password');
   };
 
@@ -846,6 +865,8 @@ export default function AdminModal({
         {!isAuthenticated ? (
           <AdminLogin
             loginStep={loginStep}
+            username={username}
+            setUsername={setUsername}
             password={password}
             setPassword={setPassword}
             otpCode={otpCode}
@@ -962,17 +983,20 @@ export default function AdminModal({
                       )}
 
                       {/* Active indicator dot for security */}
-                      {tab.id === 'security' && twoFactorEnabled && (
-                        <span style={{
-                          position: 'absolute',
-                          top: '5px',
-                          right: '5px',
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          background: '#4CAF50',
-                          boxShadow: '0 0 6px #4CAF50',
-                        }} />
+                      {tab.id === 'security' && (isDefaultCredentials || twoFactorEnabled) && (
+                        <span
+                          title={isDefaultCredentials ? 'Default credentials active — update recommended' : '2FA enabled'}
+                          style={{
+                            position: 'absolute',
+                            top: '5px',
+                            right: '5px',
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            background: isDefaultCredentials ? '#f59e0b' : '#4CAF50',
+                            boxShadow: `0 0 6px ${isDefaultCredentials ? '#f59e0b' : '#4CAF50'}`,
+                          }}
+                        />
                       )}
                     </button>
                   );
@@ -1217,6 +1241,10 @@ export default function AdminModal({
                 {activeTab === 'security' && (
                   <SecurityTab
                     token={token}
+                    adminUsername={adminUsername}
+                    setAdminUsername={setAdminUsername}
+                    isDefaultCredentials={isDefaultCredentials}
+                    setIsDefaultCredentials={setIsDefaultCredentials}
                     twoFactorEnabled={twoFactorEnabled}
                     setTwoFactorEnabled={setTwoFactorEnabled}
                     onLogout={handleLogout}

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 2026-11-22
+
+### 🔐 Authentication & Production Hardening
+- **Username + Password Admin Login**: Upgraded Admin authentication to verify both username and password using constant-time SHA-256 / `scrypt` checks.
+- **Standard Default Credentials (`admin` / `admin`)**: Replaced legacy fallback credentials with standard `admin` / `admin` defaults and added first-boot `ADMIN_USER` / `ADMIN_PASSWORD` environment variable support.
+- **Credential Management & Security Warning**: Added username editing in **Admin → Security**, a password visibility toggle on the login form, and an active Security badge/banner warning when default `admin / admin` credentials are in use.
+- **Seamless Upgrade Migration**: Existing `data/auth.json` installations automatically migrate to include the `username` field without resetting custom passwords or TOTP 2FA secrets.
+
+---
+
 ## [1.0.0] - 2026-09-18
 
 ### 🚀 Highlights

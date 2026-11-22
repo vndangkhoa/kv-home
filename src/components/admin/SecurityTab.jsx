@@ -7,11 +7,16 @@ import {
   Check,
   QrCode,
   Copy,
-  Key
+  Key,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function SecurityTab({
   token,
+  adminUsername = 'admin',
+  setAdminUsername,
+  isDefaultCredentials = false,
+  setIsDefaultCredentials,
   twoFactorEnabled,
   setTwoFactorEnabled,
   onLogout,
@@ -21,7 +26,13 @@ export default function SecurityTab({
 }) {
   const { border, text, subText, cardBg, cardBorder, inputBg, inputBorder } = tokens;
 
-  // Password change state
+  // Credentials change state
+  const [newUsername, setNewUsername] = useState(adminUsername);
+  const [prevAdminUsername, setPrevAdminUsername] = useState(adminUsername);
+  if (prevAdminUsername !== adminUsername) {
+    setPrevAdminUsername(adminUsername);
+    setNewUsername(adminUsername);
+  }
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
   const [pwMessage, setPwMessage] = useState({ text: '', isError: false });
@@ -46,7 +57,19 @@ export default function SecurityTab({
     e.preventDefault();
     setPwMessage({ text: '', isError: false });
 
-    if (!newPw || newPw.length < 4) {
+    const trimmedUsername = newUsername.trim();
+    if (!/^[a-zA-Z0-9._-]{2,32}$/.test(trimmedUsername)) {
+      setPwMessage({ text: 'Username must be 2–32 characters (letters, numbers, ., _, -)', isError: true });
+      return;
+    }
+
+    const usernameChanged = trimmedUsername !== adminUsername;
+    if (!usernameChanged && (!newPw || newPw.length < 4)) {
+      setPwMessage({ text: 'Provide a new username or a new password (min. 4 characters)', isError: true });
+      return;
+    }
+
+    if (newPw && newPw.length < 4) {
       setPwMessage({ text: 'New password must be at least 4 characters', isError: true });
       return;
     }
@@ -56,13 +79,18 @@ export default function SecurityTab({
     const timer = setTimeout(() => controller.abort(), 10000);
 
     try {
+      const payload = {
+        currentPassword: currentPw,
+        newUsername: trimmedUsername,
+        ...(newPw ? { newPassword: newPw } : {}),
+      };
       const res = await fetch('/api/auth/password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken || ''}`,
         },
-        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
       clearTimeout(timer);
@@ -79,11 +107,16 @@ export default function SecurityTab({
       }
 
       if (res.ok) {
-        setPwMessage({ text: '✓ Password updated securely on server!', isError: false });
+        if (data.username) {
+          setAdminUsername?.(data.username);
+          setNewUsername(data.username);
+        }
+        setIsDefaultCredentials?.(!!data.isDefaultCredentials);
+        setPwMessage({ text: '✓ Admin credentials updated securely on server!', isError: false });
         setCurrentPw('');
         setNewPw('');
       } else {
-        setPwMessage({ text: data.error || `Failed to update password (HTTP ${res.status})`, isError: true });
+        setPwMessage({ text: data.error || `Failed to update credentials (HTTP ${res.status})`, isError: true });
       }
     } catch (err) {
       clearTimeout(timer);
@@ -191,6 +224,43 @@ export default function SecurityTab({
 
   return (
     <div style={{ maxWidth: '520px', margin: isSplitView ? '0' : '8px auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {isDefaultCredentials && (
+        <div
+          role="alert"
+          style={{
+            background: isDark ? '#2d200b' : '#fff8e1',
+            border: `1px solid ${isDark ? '#664916' : '#ffe082'}`,
+            borderRadius: '8px',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px',
+          }}
+        >
+          <div style={{
+            width: '30px',
+            height: '30px',
+            borderRadius: '6px',
+            background: isDark ? '#422f10' : '#ffecb3',
+            color: '#f59e0b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <AlertTriangle size={16} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            <span style={{ fontSize: '13px', fontWeight: '600', color: isDark ? '#fbbf24' : '#b45309' }}>
+              Default Admin Credentials Active
+            </span>
+            <span style={{ fontSize: '11px', color: subText, lineHeight: '1.45' }}>
+              Your portal is currently using the default <code>admin / admin</code> credentials. Update your password below before exposing this dashboard publicly.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Card 1: Two-Factor Authentication */}
       <div style={{
         background: cardBg,
@@ -527,7 +597,7 @@ export default function SecurityTab({
         )}
       </div>
 
-      {/* Card 2: Update Password */}
+      {/* Card 2: Update Admin Credentials */}
       <div style={{
         background: cardBg,
         border: `1px solid ${cardBorder}`,
@@ -552,26 +622,33 @@ export default function SecurityTab({
           </div>
           <div>
             <span style={{ fontSize: '14px', fontWeight: '600', display: 'block' }}>
-              Update Admin Password
+              Update Admin Credentials
             </span>
             <span style={{ fontSize: '11px', color: subText }}>
-              Protected with cryptographic salted scrypt hashing
+              Protected with constant-time verification and salted scrypt hashing
             </span>
           </div>
         </div>
 
         <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
-            <label style={{ fontSize: '10px', color: subText, display: 'block', marginBottom: '4px' }}>
-              CURRENT PASSWORD
+            <label htmlFor="security-admin-username" style={{ fontSize: '10px', color: subText, display: 'block', marginBottom: '4px' }}>
+              ADMIN USERNAME
             </label>
             <input
-              type="password"
-              value={currentPw}
-              onChange={(e) => setCurrentPw(e.target.value)}
+              id="security-admin-username"
+              name="username"
+              type="text"
+              autoComplete="username"
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="none"
+              value={newUsername}
+              onChange={(e) => setNewUsername(e.target.value)}
               required
               style={{
                 width: '100%',
+                boxSizing: 'border-box',
                 padding: '8px 10px',
                 borderRadius: '5px',
                 border: `1px solid ${inputBorder}`,
@@ -583,16 +660,44 @@ export default function SecurityTab({
             />
           </div>
           <div>
-            <label style={{ fontSize: '10px', color: subText, display: 'block', marginBottom: '4px' }}>
-              NEW PASSWORD (MIN. 4 CHARACTERS)
+            <label htmlFor="security-current-password" style={{ fontSize: '10px', color: subText, display: 'block', marginBottom: '4px' }}>
+              CURRENT PASSWORD
             </label>
             <input
+              id="security-current-password"
+              name="current-password"
               type="password"
-              value={newPw}
-              onChange={(e) => setNewPw(e.target.value)}
+              autoComplete="current-password"
+              value={currentPw}
+              onChange={(e) => setCurrentPw(e.target.value)}
               required
               style={{
                 width: '100%',
+                boxSizing: 'border-box',
+                padding: '8px 10px',
+                borderRadius: '5px',
+                border: `1px solid ${inputBorder}`,
+                background: inputBg,
+                color: text,
+                fontSize: '12px',
+                fontFamily: 'inherit',
+              }}
+            />
+          </div>
+          <div>
+            <label htmlFor="security-new-password" style={{ fontSize: '10px', color: subText, display: 'block', marginBottom: '4px' }}>
+              NEW PASSWORD (MIN. 4 CHARACTERS — LEAVE BLANK TO KEEP CURRENT)
+            </label>
+            <input
+              id="security-new-password"
+              name="new-password"
+              type="password"
+              autoComplete="new-password"
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
                 padding: '8px 10px',
                 borderRadius: '5px',
                 border: `1px solid ${inputBorder}`,
@@ -631,7 +736,7 @@ export default function SecurityTab({
                 marginTop: '4px'
               }}
             >
-              Update Password
+              Update Credentials
             </button>
           </div>
         </form>

@@ -104,7 +104,7 @@ docker run -d \
   vndangkhoa/kv-home:latest
 ```
 
-Open **`http://localhost:3000`** in your browser.
+Open **`http://localhost:3000`** in your browser. Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd> (or click **Admin**) and sign in with the default credentials: **`admin` / `admin`** (or set `ADMIN_USER` / `ADMIN_PASSWORD` environment variables on first boot).
 
 ---
 
@@ -118,6 +118,10 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    environment:
+      # Optional first-boot credential overrides (defaults to admin / admin)
+      - ADMIN_USER=admin
+      - ADMIN_PASSWORD=admin
     volumes:
       # Persistent link data and 2FA credentials
       - ./data:/app/data
@@ -138,9 +142,10 @@ docker compose up -d
 
 KV Home is hardened for public exposure on personal domains:
 
+- **Default Admin Login**: Username `admin` / Password `admin` (configurable on first boot via `ADMIN_USER` and `ADMIN_PASSWORD`). Update credentials in **Admin → Security** and enable TOTP 2FA before public exposure; an active Security warning reminds you whenever default credentials are still in use.
 - **Two-Factor Authentication**: RFC 6238 TOTP with QR Code scanner compatible with Google Authenticator, Apple Passwords, 1Password, and Authy.
 - **Salted `scrypt` Passwords**: Hashes credentials with unique 16-byte random salts.
-- **Side-Channel Defense**: Uses `crypto.timingSafeEqual` to defeat timing attacks.
+- **Side-Channel Defense**: Uses `crypto.timingSafeEqual` for both username and password checks to defeat timing attacks.
 - **Brute-Force Lockout**: Automatically locks out IP addresses for 15 minutes after 5 consecutive failed attempts.
 - **Hardened HTTP Headers**: Strict CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`.
 
